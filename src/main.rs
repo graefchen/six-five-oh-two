@@ -107,6 +107,13 @@ impl Chip {
         data
     }
 
+    fn write_byte(&mut self, byte: u8, address: u16) {
+        if DEBUGLOG {
+            println!("write_byte");
+        }
+        self.memory[address as usize] = byte;
+    }
+
     fn read_word(&mut self, address: u16) -> u16 {
         if DEBUGLOG {
             println!("read_word");
@@ -142,6 +149,7 @@ impl Chip {
         (ll as u16) + ((hh as u16) << 8)
     }
 
+    /// Returns the address depending on the given AddreessMode
     fn get_address(&mut self, addr: AddressMode) -> u16 {
         match addr {
             AddressMode::Immediate => {
@@ -332,7 +340,7 @@ impl Chip {
             (0x8, 0x4) => self.sty(AddressMode::Zeropage),
             (0x8, 0x5) => self.sta(AddressMode::Zeropage),
             (0x8, 0x6) => self.stx(AddressMode::Zeropage),
-            (0x8, 0x8) => self.dey(AddressMode::Implied),
+            (0x8, 0x8) => self.dey(),
             (0x8, 0xC) => self.sty(AddressMode::Absolute),
             (0x8, 0xA) => self.txa(AddressMode::Implied),
             (0x8, 0xD) => self.sta(AddressMode::Absolute),
@@ -374,11 +382,11 @@ impl Chip {
             (0xC, 0x4) => self.cpy(AddressMode::Zeropage),
             (0xC, 0x5) => self.cmp(AddressMode::Zeropage),
             (0xC, 0x6) => self.dec(AddressMode::Zeropage),
-            (0xC, 0x8) => self.iny(AddressMode::Implied),
+            (0xC, 0x8) => self.iny(),
             (0xC, 0x9) => self.cmp(AddressMode::Immediate),
             (0xC, 0xC) => self.cpy(AddressMode::Absolute),
             (0xC, 0xD) => self.cmp(AddressMode::Absolute),
-            (0xC, 0xA) => self.dex(AddressMode::Implied),
+            (0xC, 0xA) => self.dex(),
             (0xC, 0xE) => self.dec(AddressMode::Absolute),
             (0xD, 0x0) => self.bne(AddressMode::Relative),
             (0xD, 0x1) => self.cmp(AddressMode::IndirectY),
@@ -393,9 +401,9 @@ impl Chip {
             (0xE, 0x4) => self.cpx(AddressMode::Zeropage),
             (0xE, 0x5) => self.sbc(AddressMode::Zeropage),
             (0xE, 0x6) => self.inc(AddressMode::Zeropage),
-            (0xE, 0x8) => self.inx(AddressMode::Implied),
+            (0xE, 0x8) => self.inx(),
             (0xE, 0x9) => self.sbc(AddressMode::Immediate),
-            (0xE, 0xA) => self.nop(AddressMode::Implied),
+            (0xE, 0xA) => self.nop(),
             (0xE, 0xC) => self.cpx(AddressMode::Absolute),
             (0xE, 0xD) => self.sbc(AddressMode::Absolute),
             (0xE, 0xE) => self.inc(AddressMode::Absolute),
@@ -420,9 +428,11 @@ impl Chip {
         if DEBUGLOG {
             println!("lda");
         };
-        self.f = N | Z;
         let address = self.get_address(addr);
         self.acc = self.read_byte(address);
+        if self.acc == 0 {
+            self.f = Z;
+        }
     }
 
     // load X
@@ -430,9 +440,11 @@ impl Chip {
         if DEBUGLOG {
             println!("ldx");
         }
-        self.f = N | Z;
         let address = self.get_address(addr);
         self.rx = self.read_byte(address);
+        if self.rx == 0 {
+            self.f = Z;
+        }
     }
 
     // load Y
@@ -440,9 +452,11 @@ impl Chip {
         if DEBUGLOG {
             println!("ldy");
         }
-        self.f = N | Z;
         let address = self.get_address(addr);
         self.ry = self.read_byte(address);
+        if self.ry == 0 {
+            self.f = Z;
+        }
     }
 
     // store accumulator
@@ -562,23 +576,34 @@ impl Chip {
         if DEBUGLOG {
             println!("dec");
         }
-        todo!("dec");
+        let address = self.get_address(addr);
+        let res = self.read_byte(address) - 1;
+        self.write_byte(res, address);
+        if res == 0 {
+            self.f = Z;
+        }
     }
 
     // decrement X
-    fn dex(&mut self, addr: AddressMode) {
+    fn dex(&mut self) {
         if DEBUGLOG {
             println!("dex");
         }
-        todo!("dex");
+        self.rx -= 1;
+        if self.rx == 0 {
+            self.f = Z;
+        }
     }
 
     // decrement Y
-    fn dey(&mut self, addr: AddressMode) {
+    fn dey(&mut self) {
         if DEBUGLOG {
             println!("dey");
         }
-        todo!("dey");
+        self.ry -= 1;
+        if self.ry == 0 {
+            self.f = Z;
+        }
     }
 
     // increment
@@ -586,23 +611,34 @@ impl Chip {
         if DEBUGLOG {
             println!("inc");
         }
-        todo!("inc");
+        let address = self.get_address(addr);
+        let res = self.read_byte(address) + 1;
+        self.write_byte(res, address);
+        if res == 0 {
+            self.f = Z;
+        }
     }
 
     // increment X
-    fn inx(&mut self, addr: AddressMode) {
+    fn inx(&mut self) {
         if DEBUGLOG {
             println!("inx");
         }
-        todo!("inx");
+        self.rx -= 1;
+        if self.rx  == 0 {
+            self.f = Z;
+        }
     }
 
     // increment Y
-    fn iny(&mut self, addr: AddressMode) {
+    fn iny(&mut self) {
         if DEBUGLOG {
             println!("iny");
         }
-        todo!("iny");
+        self.ry -= 1;
+        if self.ry == 0 {
+            self.f = Z;
+        }
     }
 
     /// ======================
@@ -637,7 +673,9 @@ impl Chip {
         let address = self.get_address(addr);
         let and = self.read_byte(address);
         self.acc &= and;
-        todo!("and");
+        if self.acc == 0 {
+            self.f = Z;
+        }
     }
 
     // exclusive or (with accumulator)
@@ -931,11 +969,14 @@ impl Chip {
     }
 
     // no operation
-    fn nop(&mut self, addr: AddressMode) {
+    fn nop(&mut self) {
         if DEBUGLOG {
             println!("nop");
         }
-        todo!("nop");
+        // A simple empty field
+        // because what says truly more than
+        // no operation than simply
+        // not doing anything?
     }
 }
 
@@ -1025,7 +1066,7 @@ mod load_accumulator {
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(N | Z, c.f);
+        assert_eq!(Z, c.f);
     }
 }
 
@@ -1086,7 +1127,7 @@ mod load_x {
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(N | Z, c.f);
+        assert_eq!(Z, c.f);
     }
 }
 
@@ -1147,7 +1188,7 @@ mod load_y {
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(N | Z, c.f);
+        assert_eq!(Z, c.f);
     }
 }
 
