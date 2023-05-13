@@ -181,8 +181,14 @@ impl Chip {
         Ok(())
     }
 
+    fn fetch_byte(&mut self) -> u8 {
+        self.pc += 1;
+        self.memory[(self.pc - 1) as usize]
+    }
+    
+
     pub fn execute_cycle(&mut self) {
-        let opcode: u8 = read_word(self.memory, self.pc);
+        let opcode: u8 = self.fetch_byte();
         self.process_opcode(opcode);
     }
 
@@ -198,7 +204,7 @@ impl Chip {
 
         // If we are still on memory we should make stuff ...
         if self.pc < (self.memory.len() - 0x206) as u16 {
-            self.pc += 1;
+            
         } else {
             panic!("We enter a loop");
         }
@@ -809,10 +815,6 @@ impl Chip {
             println!("nop");
         };
     }
-}
-
-fn read_word(memory: [u8; MEMORY], index: u16) -> u8 {
-    memory[(index) as usize]
 }
 
 fn main() {
