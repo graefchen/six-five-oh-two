@@ -1,32 +1,53 @@
+use core::panic;
+// Imports for reading a file
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
+const DEBUGLOG: bool = true;
+
 const MEMORY: usize = 65536;
 
 // The flag for the flag in the Chip
-// enum Flag {
-//     N = 0x80, // [1000 0000] negative
-//     V = 0x40, // [0100 0000] overflow
-//               // [0010 0000] Reserved
-//     B = 0x10, // [0001 0000] break
-//     D = 0x08, // [0000 1000] decimale
-//     I = 0x04, // [0000 0100] interrpt disable
-//     Z = 0x02, // [0000 0010] zero
-//     C = 0x00, // [0000 0001] carry
-// }
+enum Flag {
+    N = 0x80, // [1000 0000] negative
+    V = 0x40, // [0100 0000] overflow
+              // [0010 0000] Reserved
+    B = 0x10, // [0001 0000] break
+    D = 0x08, // [0000 1000] decimale
+    I = 0x04, // [0000 0100] interrpt disable
+    Z = 0x02, // [0000 0010] zero
+    C = 0x00, // [0000 0001] carry
+}
+
+#[derive(Debug)]
+enum AddressMode {
+    Accumulator,
+    Absolute,
+    AbsoluteX,
+    AbsoluteY,
+    Immediate,
+    Implied,
+    Indirect,
+    XIndirect,
+    IndirectY,
+    Relative,
+    Zeropage,
+    ZeropageX,
+    ZeropageY,
+}
 
 struct Chip {
     // Registers:
     // Accumulator:
-    // pub acc: u8,
-    // // Index's x and y:
-    // pub rx: u8,
-    // pub ry: u8,
-    // // Process Status flag:
-    // pub f: Flag,
-    // // Stack Pointer:
-    // pub sp: u8,
+    pub acc: u8,
+    // Index's x and y:
+    pub rx: u8,
+    pub ry: u8,
+    // Process Status flag:
+    pub f: Flag,
+    // Stack Pointer:
+    pub sp: u8,
     // Program Counter:
     pub pc: u16,
     // TODO: Putting Memory in it's own struct
@@ -41,21 +62,116 @@ struct Chip {
 impl Chip {
     pub fn new() -> Chip {
         Chip {
-            // acc: 0,
-            // rx: 0,
-            // ry: 0,
-            // f: Flag::Z,
-            // sp: 0,
-            pc: 0,
+            acc: 0,
+            rx: 0,
+            ry: 0,
+            f: Flag::Z,
+            sp: 0,
+            pc: 0x0200, // 256 + 256
             memory: [0; MEMORY],
         }
     }
+
+    /// Helper functions
+
+    fn push_stack(&mut self, address: u8) {
+        self.memory[0x0100 + self.sp as usize] = address;
+        // self.sp += 1;
+    }
+
+    fn pop_stack(&mut self) {
+        self.memory[0x0100 + self.sp as usize] = 0;
+        self.sp -= 1;
+    }
+
+    fn get_address(&mut self, addr: AddressMode) -> u8 {
+        match addr {
+            AddressMode::Immediate => {
+                return self.memory[(self.pc) as usize];
+            }
+            AddressMode::Absolute => {
+                self.pc += 2;
+                let ll = self.memory[(self.pc - 1) as usize];
+                let hh = self.memory[(self.pc) as usize];
+                let address = (ll as u16) + ((hh as u16) << 8);
+                return self.memory[(address) as usize];
+            }
+            AddressMode::Zeropage => {
+                let ll = self.memory[(self.pc - 1) as usize];
+                let address = ll as u16;
+                return self.memory[(address) as usize];
+            }
+            AddressMode::AbsoluteX => {
+                self.pc += 2;
+                let ll = self.memory[(self.pc - 1) as usize];
+                let hh = self.memory[(self.pc) as usize];
+                let address = (ll as u16) + ((hh as u16) << 8);
+                let x = self.rx;
+                return self.memory[(address) as usize] + x;
+            }
+            AddressMode::AbsoluteY => {
+                self.pc += 2;
+                let ll = self.memory[(self.pc - 1) as usize];
+                let hh = self.memory[(self.pc) as usize];
+                let address = (ll as u16) + ((hh as u16) << 8);
+                let y = self.ry;
+                return self.memory[(address) as usize] + y;
+            }
+            AddressMode::ZeropageX => {
+                let ll = self.memory[(self.pc - 1) as usize];
+                let address = ll as u16;
+                let x = self.rx;
+                return self.memory[(address) as usize] + x;
+            }
+            AddressMode::ZeropageY => {
+                let ll = self.memory[(self.pc - 1) as usize];
+                let address = ll as u16;
+                let y = self.ry;
+                return self.memory[(address) as usize] + y;
+            }
+            AddressMode::Indirect => {
+                self.pc += 2;
+                let ll = self.memory[(self.pc - 1) as usize];
+                let hh = self.memory[(self.pc) as usize];
+                let address = (ll as u16) + ((hh as u16) << 8);
+                let ll_2 = self.memory[(address) as usize];
+                let hh_2 = self.memory[(address + 1) as usize];
+                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8);
+                return self.memory[address_2 as usize];
+            }
+            AddressMode::XIndirect => {
+                let ll = self.memory[(self.pc - 1) as usize];
+                let x = self.rx;
+                let address = (ll + x) as u16;
+                let ll_2 = self.memory[(address) as usize];
+                let hh_2 = self.memory[(address + 1) as usize];
+                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8);
+                return self.memory[(address_2) as usize];
+            }
+            AddressMode::IndirectY => {
+                let ll = self.memory[(self.pc - 1) as usize];
+                let y = self.ry;
+                let address = ll as u16;
+                let ll_2 = self.memory[(address) as usize];
+                let hh_2 = self.memory[(address + 1) as usize];
+                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8) + y as u16;
+                return self.memory[(address_2) as usize];
+            }
+            AddressMode::Relative => {
+                let off = self.memory[self.pc as usize];
+                return off;
+            }
+            _ => { return 0; }
+        }
+    }
+
     pub fn load_exe(&mut self, file_path: String) -> io::Result<()> {
         let mut f = File::open(file_path)?;
         let mut buffer = Vec::new();
 
         f.read_to_end(&mut buffer)?;
         // println!("buffer.len() = {}", buffer.len());
+        // println!("{:?}", buffer);
         // println!("self.memory.len() = {}", self.memory.len());
         for i in 0..buffer.len() {
             // println!("i is {i}");
@@ -71,422 +187,627 @@ impl Chip {
     }
 
     fn process_opcode(&mut self, opcode: u8) {
+        if DEBUGLOG {
+            println!("Processsing Opcode '${:X}'", opcode)
+        }
+
         // Format: AAA-BBB-CC
         // let aaa = opcode >> 5;
         // let bbb = (opcode & 0x1C) >> 3;
         // let cc = opcode & 0x03;
 
-        // Getting High nibble and low nibble
+        // If we are still on memory we should make stuff ...
+        if self.pc < (self.memory.len() - 0x206) as u16 {
+            self.pc += 1;
+        } else {
+            panic!("We enter a loop");
+        }
+
+        // opcodes
         let op_1 = (opcode & 0xF0) >> 4;
         let op_2 = opcode & 0x0F;
 
-        if self.pc < self.memory.len() as u16 {
-            self.pc += 1;
-        }
+        // println!("{:X} {:X}", op_1, op_2);
 
-        // Very much long ... but I let it stay it that way ... for now ...
         match (op_1, op_2) {
-            // BRK impl
-            (0x0, 0x0) => {},
-            // ORA X, ind
-            (0x0, 0x1) => {},
-            // FIXME: Illegal
-            (0x0, 0x4) => {},
-            // ORA zpg
-            (0x0, 0x5) => {},
-            // ASL zpg
-            (0x0, 0x6) => {},
-            // PHP impl
-            (0x0, 0x8) => {},
-            // ORA #
-            (0x0, 0x9) => {},
-            // ASL A
-            (0x0, 0xA) => {},
-            // FIXME: Illegal
-            (0x0, 0xC) => {},
-            // ORA abs
-            (0x0, 0xD) => {},
-            // ASL abs
-            (0x0, 0xE) => {},
-
-            // BPL rel
-            (0x1, 0x0) => {},
-            // ORA ind, Y
-            (0x1, 0x1) => {},
-            // FIXME: Illegal
-            (0x1, 0x2) => {},
-            // FIXME: Illegal
-            (0x1, 0x4) => {},
-            // ORA zpg, X
-            (0x1, 0x5) => {},
-            // ASL zpg, X
-            (0x1, 0x6) => {},
-            // CLC impl
-            (0x1, 0x8) => {},
-            // OR abs, y
-            (0x1, 0x9) => {},
-            // FIXME: Illegal
-            (0x1, 0xA) => {},
-            // FIXME: Illegal
-            (0x1, 0xC) => {},
-            // ORA abs, X
-            (0x1, 0xD) => {},
-            // ASL abs, X
-            (0x1, 0xE) => {},
-
-            // JSR abs
-            (0x2, 0x0) => {},
-            // AND X, ind
-            (0x2, 0x1) => {},
-            // BIT zpg
-            (0x2, 0x4) => {},
-            // AND #
-            (0x2, 0x5) => {},
-            // ROL zpg
-            (0x2, 0x6) => {},
-            // PLP impl
-            (0x2, 0x8) => {},
-            // AND #
-            (0x2, 0x9) => {},
-            // ROL A
-            (0x2, 0xA) => {},
-            // BIT abs
-            (0x2, 0xC) => {},
-            // AND abs
-            (0x2, 0xD) => {},
-            // ROL abs
-            (0x2, 0xE) => {},
-
-            // BMI rel
-            (0x3, 0x0) => {},
-            // AND ind, Y
-            (0x3, 0x1) => {},
-            // FIXME: Illegal
-            (0x3, 0x4) => {},
-            // AND zgp, X
-            (0x3, 0x5) => {},
-            // ROL zgp, X
-            (0x3, 0x6) => {},
-            // SEC impl
-            (0x3, 0x8) => {},
-            // AND abs, Y
-            (0x3, 0x9) => {},
-            // FIXME: Illegal
-            (0x3, 0xA) => {},
-            // FIXME: Illegal
-            (0x3, 0xC) => {},
-            // AND abs, X
-            (0x3, 0xD) => {},
-            // ROL abs, X
-            (0x3, 0xE) => {},
-
-            // RTI impl
-            (0x4, 0x0) => {},
-            // EOR X, ind
-            (0x4, 0x1) => {},
-            // FIXME: Illegal
-            (0x4, 0x4) => {},
-            // EOR zgp
-            (0x4, 0x5) => {},
-            // LSR zgp
-            (0x4, 0x6) => {},
-            // PHA impl
-            (0x4, 0x8) => {},
-            // EOR #
-            (0x4, 0x9) => {},
-            // LSR A
-            (0x4, 0xA) => {},
-            // JMP abs
-            (0x4, 0xC) => {},
-            // EOR abs
-            (0x4, 0xD) => {},
-            // LSR abs
-            (0x4, 0xE) => {},
-
-            // BVC rel
-            (0x5, 0x0) => {},
-            // EOR ind, y
-            (0x5, 0x1) => {},
-            // FIXME: Illegal
-            (0x5, 0x4) => {},
-            // EOR zgp,X
-            (0x5, 0x5) => {},
-            // LSR zgp,X
-            (0x5, 0x6) => {},
-            // CLI impl
-            (0x5, 0x8) => {},
-            // EOR abs, Y
-            (0x5, 0x9) => {},
-            // FIXME: Illegal
-            (0x5, 0xA) => {},
-            // FIXME: Illegal
-            (0x5, 0xC) => {},
-            // EOR abs, X
-            (0x5, 0xD) => {},
-            // LSR abs,X
-            (0x5, 0xE) => {},
-
-            // RTS impl
-            (0x6, 0x0) => {},
-            // ADC x, indx
-            (0x6, 0x1) => {},
-            // FIXME: Illegal
-            (0x6, 0x4) => {},
-            // ABC zpg
-            (0x6, 0x5) => {},
-            // ROR zgp
-            (0x6, 0x6) => {},
-            // PLA impl
-            (0x6, 0x8) => {},
-            // ADC #
-            (0x6, 0x9) => {},
-            // ROR A
-            (0x6, 0xA) => {},
-            // JMP ind
-            (0x6, 0xC) => {},
-            // ADB abs
-            (0x6, 0xD) => {},
-            // ROR abs
-            (0x6, 0xE) => {},
-
-            // BVS rel
-            (0x7, 0x0) => {},
-            // ADC ind, Y
-            (0x7, 0x1) => {},
-            // FIXME: Illegal
-            (0x7, 0x2) => {},
-            // FIXME: Illegal
-            (0x7, 0x4) => {},
-            // ADC zpg, X
-            (0x7, 0x5) => {},
-            // ROR zpg, X
-            (0x7, 0x6) => {},
-            // SEI impl
-            (0x7, 0x8) => {},
-            // ABD abs, Y
-            (0x7, 0x9) => {},
-            // FIXME: Illegal
-            (0x7, 0xA) => {},
-            // FIXME: Illegal
-            (0x7, 0xC) => {},
-            // ADC abs, X
-            (0x7, 0xD) => {},
-            // ROR abs, X
-            (0x7, 0xE) => {},
-
-            // FIXME: Illegal
-            (0x8, 0x0) => {},
-            // STR x, ind
-            (0x8, 0x1) => {},
-            // FIXME: Illegal
-            (0x8, 0x2) => {},
-            // STY zpg
-            (0x8, 0x4) => {},
-            // STA zpg
-            (0x8, 0x5) => {},
-            // STX zpg
-            (0x8, 0x6) => {},
-            // DAY impl
-            (0x8, 0x8) => {},
-            // FIXME: Illegal
-            (0x8, 0x9) => {},
-            // TXA impl
-            (0x8, 0xA) => {},
-            // STY abs
-            (0x8, 0xC) => {},
-            // STA abs
-            (0x8, 0xD) => {},
-            // STX abs
-            (0x8, 0xE) => {},
-
-            // BCC rel
-            (0x9, 0x0) => {},
-            // STA ind, Y
-            (0x9, 0x1) => {},
-            // FIXME: Illegal
-            (0x9, 0x2) => {},
-            // STY zgp, X
-            (0x9, 0x4) => {},
-            // STA zgp, X
-            (0x9, 0x5) => {},
-            // STX zgp, Y
-            (0x9, 0x6) => {},
-            // TYA impl
-            (0x9, 0x8) => {},
-            // LDA #
-            (0x9, 0x9) => {},
-            // TSX impl
-            (0x9, 0xA) => {},
-            // LDY abs
-            (0x9, 0xC) => {},
-            // LDA abs
-            (0x9, 0xD) => {},
-            // LDX abs
-            (0x9, 0xE) => {},
-
-            // LDY #
-            (0xA, 0x0) => {},
-            // LDA X, ind
-            (0xA, 0x1) => {},
-            // LDX #
-            (0xA, 0x2) => {},
-            // LDY zpg
-            (0xA, 0x4) => {},
-            // LDA zgp
-            (0xA, 0x5) => {},
-            // LDX zpg
-            (0xA, 0x6) => {},
-            // TAY impl
-            (0xA, 0x8) => {},
-            // LDA #
-            (0xA, 0x9) => {},
-            // TAX impl
-            (0xA, 0xA) => {},
-            // LDY abs
-            (0xA, 0xC) => {},
-            // LDA abs
-            (0xA, 0xE) => {},
-            // LDX abs
-            (0xA, 0xD) => {},
-
-            // BCS rel
-            (0xB, 0x0) => {},
-            // LDA ind, Y
-            (0xB, 0x1) => {},
-            // FIXME: Illegal
-            (0xB, 0x2) => {},
-            // LDY zpg, X
-            (0xB, 0x4) => {},
-            // LDA zpg, X
-            (0xB, 0x5) => {},
-            // LDX zpg, Y
-            (0xB, 0x6) => {},
-            // CLV impl
-            (0xB, 0x8) => {},
-            // LDA abs, Y
-            (0xB, 0x9) => {},
-            // TSV impl
-            (0xB, 0xA) => {},
-            // LDY abs, X
-            (0xB, 0xC) => {},
-            // LDA abs, X
-            (0xB, 0xD) => {},
-            // LDX abs, Y
-            (0xB, 0xE) => {},
-
-            // CPY #
-            (0xC, 0x0) => {},
-            // CMP x, ind
-            (0xC, 0x1) => {},
-            // FIXME: Illegal
-            (0xC, 0x2) => {},
-            // CPY zpg
-            (0xC, 0x4) => {},
-            // CPM zpg
-            (0xC, 0x5) => {},
-            // DEC zpg
-            (0xC, 0x6) => {},
-            // INY impl
-            (0xC, 0x8) => {},
-            // CMP #
-            (0xC, 0x9) => {},
-            // DEX impl
-            (0xC, 0xA) => {},
-            // CPY abs
-            (0xC, 0xC) => {},
-            // CMP abs
-            (0xC, 0xD) => {},
-            // DEC abs
-            (0xC, 0xE) => {},
-
-            // BNE rel
-            (0xD, 0x0) => {},
-            // CMP ind, Y
-            (0xD, 0x1) => {},
-            // FIXME: Illegal
-            (0xD, 0x2) => {},
-            // FIXME: Illegal
-            (0xD, 0x4) => {},
-            // CMP zpg, X
-            (0xD, 0x5) => {},
-            // DEC zpg, X
-            (0xD, 0x6) => {},
-            // CLD imp
-            (0xD, 0x8) => {},
-            // CLD impl
-            (0xD, 0x9) => {},
-            // FIXME: Illegal
-            (0xD, 0xA) => {},
-            // FIXME: Illegal
-            (0xD, 0xC) => {},
-            // CPM abs, X
-            (0xD, 0xD) => {},
-            // DEC abs, X
-            (0xD, 0xE) => {},
-
-            // CPX #
-            (0xE, 0x0) => {},
-            // SPX X, ind
-            (0xE, 0x1) => {},
-            // FIXME: Illegal
-            (0xE, 0x2) => {},
-            // CPX zpg
-            (0xE, 0x4) => {},
-            // SBC zpg
-            (0xE, 0x5) => {},
-            // INC zpg
-            (0xE, 0x6) => {},
-            // INX impl
-            (0xE, 0x8) => {},
-            // SBC #
-            (0xE, 0x9) => {},
-            // NOP impl
-            (0xE, 0xA) => {},
-            // CPX abs
-            (0xE, 0xC) => {},
-            // SBC abs
-            (0xE, 0xD) => {},
-            // INC abs
-            (0xE, 0xE) => {},
-
-            // BEQ rel
-            (0xF, 0x0) => {},
-            // SBC ind, Y
-            (0xF, 0x1) => {},
-            // FIXME: Illegal
-            (0xF, 0x2) => {},
-            // FIXME: Illegal
-            (0xF, 0x4) => {},
-            // SBC zpg, X
-            (0xF, 0x5) => {},
-            // INC zpg, X
-            (0xF, 0x6) => {},
-            // SED impl
-            (0xF, 0x8) => {},
-            // SBC abs, Y
-            (0xF, 0x9) => {},
-            // FIXME: Illegal
-            (0xF, 0xA) => {},
-            // FIXME: Illegal
-            (0xF, 0xC) => {},
-            // SBC abs, X
-            (0xF, 0xD) => {},
-            // INC abs, X
-            (0xF, 0xE) => {},
-
-            // TODO: revision after adding all opcodes
-            (_, 0x2) => {},
-            // TODO: revision after adding all opcodes
-            (_, 0x3) => {},
-            // TODO: revision after adding all opcodes
-            (_, 0x7) => {},
-            // TODO: revision after adding all opcodes
-            (_, 0xB) => {},
-            // TODO: revision after adding all opcodes
-            (_, 0xF) => {},
-
-            (_, _) => todo!("unknown upcode: hi:{:X}; low: {:X}", op_1, op_2),
+            (0x0, 0x0) => self.brk(),
+            (0x0, 0x1) => self.ora(AddressMode::XIndirect),
+            (0x0, 0x5) => self.ora(AddressMode::Zeropage),
+            (0x0, 0x6) => self.asl(AddressMode::Zeropage),
+            (0x0, 0x8) => self.php(AddressMode::Implied),
+            (0x0, 0x9) => self.ora(AddressMode::Immediate),
+            (0x0, 0xA) => self.asl(AddressMode::Accumulator),
+            (0x0, 0xD) => self.ora(AddressMode::Absolute),
+            (0x0, 0xE) => self.asl(AddressMode::Absolute),
+            (0x1, 0x0) => self.bpl(AddressMode::Relative),
+            (0x1, 0x1) => self.ora(AddressMode::IndirectY),
+            (0x1, 0x5) => self.ora(AddressMode::ZeropageX),
+            (0x1, 0x6) => self.asl(AddressMode::ZeropageX),
+            (0x1, 0x8) => self.clc(AddressMode::Implied),
+            (0x1, 0x9) => self.ora(AddressMode::AbsoluteY),
+            (0x1, 0xD) => self.ora(AddressMode::AbsoluteX),
+            (0x1, 0xE) => self.asl(AddressMode::AbsoluteX),
+            (0x2, 0x0) => self.jsr(AddressMode::Absolute),
+            (0x2, 0x4) => self.bit(AddressMode::Zeropage),
+            (0x2, 0x1) => self.and(AddressMode::XIndirect),
+            (0x2, 0x5) => self.and(AddressMode::Zeropage),
+            (0x2, 0x6) => self.rol(AddressMode::Zeropage),
+            (0x2, 0x8) => self.plp(AddressMode::Implied),
+            (0x2, 0x9) => self.and(AddressMode::Immediate),
+            (0x2, 0xA) => self.rol(AddressMode::Accumulator),
+            (0x2, 0xC) => self.bit(AddressMode::Absolute),
+            (0x2, 0xD) => self.and(AddressMode::Absolute),
+            (0x2, 0xE) => self.rol(AddressMode::Absolute),
+            (0x3, 0x0) => self.bmi(AddressMode::Relative),
+            (0x3, 0x1) => self.and(AddressMode::IndirectY),
+            (0x3, 0x5) => self.and(AddressMode::ZeropageX),
+            (0x3, 0x6) => self.rol(AddressMode::ZeropageX),
+            (0x3, 0x8) => self.sec(AddressMode::Implied),
+            (0x3, 0x9) => self.and(AddressMode::AbsoluteY),
+            (0x3, 0xD) => self.and(AddressMode::AbsoluteX),
+            (0x3, 0xE) => self.rol(AddressMode::AbsoluteX),
+            (0x4, 0x0) => self.rti(AddressMode::Implied),
+            (0x4, 0x1) => self.eor(AddressMode::XIndirect),
+            (0x4, 0x5) => self.eor(AddressMode::Zeropage),
+            (0x4, 0x6) => self.lsr(AddressMode::Zeropage),
+            (0x4, 0x8) => self.pha(AddressMode::Implied),
+            (0x4, 0x9) => self.eor(AddressMode::Immediate),
+            (0x4, 0xA) => self.lsr(AddressMode::Accumulator),
+            (0x4, 0xC) => self.jmp(AddressMode::Absolute),
+            (0x4, 0xE) => self.lsr(AddressMode::Absolute),
+            (0x4, 0xD) => self.eor(AddressMode::Absolute),
+            (0x5, 0x0) => self.bvc(AddressMode::Relative),
+            (0x5, 0x1) => self.eor(AddressMode::IndirectY),
+            (0x5, 0x5) => self.eor(AddressMode::ZeropageX),
+            (0x5, 0x6) => self.lsr(AddressMode::ZeropageX),
+            (0x5, 0x8) => self.cli(AddressMode::Implied),
+            (0x5, 0x9) => self.eor(AddressMode::AbsoluteY),
+            (0x5, 0xD) => self.eor(AddressMode::AbsoluteX),
+            (0x5, 0xE) => self.lsr(AddressMode::AbsoluteX),
+            (0x6, 0x0) => self.rts(),
+            (0x6, 0x1) => self.adc(AddressMode::XIndirect),
+            (0x6, 0x5) => self.adc(AddressMode::Zeropage),
+            (0x6, 0x6) => self.ror(AddressMode::Zeropage),
+            (0x6, 0x8) => self.pla(AddressMode::Implied),
+            (0x6, 0x9) => self.adc(AddressMode::Immediate),
+            (0x6, 0xC) => self.jmp(AddressMode::Indirect),
+            (0x6, 0xA) => self.ror(AddressMode::Accumulator),
+            (0x6, 0xD) => self.adc(AddressMode::Absolute),
+            (0x6, 0xE) => self.ror(AddressMode::Absolute),
+            (0x7, 0x0) => self.bvs(AddressMode::Relative),
+            (0x7, 0x1) => self.adc(AddressMode::IndirectY),
+            (0x7, 0x5) => self.adc(AddressMode::ZeropageX),
+            (0x7, 0x6) => self.ror(AddressMode::ZeropageX),
+            (0x7, 0x8) => self.sei(AddressMode::Implied),
+            (0x7, 0x9) => self.adc(AddressMode::AbsoluteY),
+            (0x7, 0xD) => self.adc(AddressMode::AbsoluteX),
+            (0x7, 0xE) => self.ror(AddressMode::AbsoluteX),
+            (0x8, 0x1) => self.sta(AddressMode::XIndirect),
+            (0x8, 0x4) => self.sty(AddressMode::Zeropage),
+            (0x8, 0x5) => self.sta(AddressMode::Zeropage),
+            (0x8, 0x6) => self.stx(AddressMode::Zeropage),
+            (0x8, 0x8) => self.dey(AddressMode::Implied),
+            (0x8, 0xC) => self.sty(AddressMode::Absolute),
+            (0x8, 0xA) => self.txa(AddressMode::Implied),
+            (0x8, 0xD) => self.sta(AddressMode::Absolute),
+            (0x8, 0xE) => self.stx(AddressMode::Absolute),
+            (0x9, 0x0) => self.bcc(AddressMode::Relative),
+            (0x9, 0x1) => self.sta(AddressMode::IndirectY),
+            (0x9, 0x4) => self.sty(AddressMode::ZeropageX),
+            (0x9, 0x5) => self.sta(AddressMode::ZeropageX),
+            (0x9, 0x6) => self.stx(AddressMode::ZeropageY),
+            (0x9, 0x8) => self.tya(AddressMode::Implied),
+            (0x9, 0x9) => self.sta(AddressMode::AbsoluteY),
+            (0x9, 0xD) => self.sta(AddressMode::AbsoluteX),
+            (0x9, 0xA) => self.txs(AddressMode::Implied),
+            (0xA, 0x0) => self.ldy(AddressMode::Immediate),
+            (0xA, 0x1) => self.lda(AddressMode::XIndirect),
+            (0xA, 0x2) => self.ldx(AddressMode::Immediate),
+            (0xA, 0x4) => self.ldy(AddressMode::Zeropage),
+            (0xA, 0x5) => self.lda(AddressMode::Zeropage),
+            (0xA, 0x6) => self.ldx(AddressMode::Zeropage),
+            (0xA, 0x8) => self.tay(AddressMode::Implied),
+            (0xA, 0x9) => self.lda(AddressMode::Immediate),
+            (0xA, 0xA) => self.tax(AddressMode::Implied),
+            (0xA, 0xC) => self.ldy(AddressMode::Absolute),
+            (0xA, 0xD) => self.lda(AddressMode::Absolute),
+            (0xA, 0xE) => self.ldx(AddressMode::Absolute),
+            (0xB, 0x0) => self.bcs(AddressMode::Relative),
+            (0xB, 0x1) => self.lda(AddressMode::IndirectY),
+            (0xB, 0x4) => self.ldy(AddressMode::ZeropageX),
+            (0xB, 0x5) => self.lda(AddressMode::ZeropageX),
+            (0xB, 0x6) => self.ldx(AddressMode::ZeropageY),
+            (0xB, 0x8) => self.clv(AddressMode::Implied),
+            (0xB, 0x9) => self.lda(AddressMode::AbsoluteY),
+            (0xB, 0xA) => self.tsx(AddressMode::Implied),
+            (0xB, 0xC) => self.ldy(AddressMode::AbsoluteX),
+            (0xB, 0xD) => self.lda(AddressMode::AbsoluteX),
+            (0xB, 0xE) => self.ldx(AddressMode::AbsoluteY),
+            (0xC, 0x0) => self.cpy(AddressMode::Immediate),
+            (0xC, 0x1) => self.cmp(AddressMode::XIndirect),
+            (0xC, 0x4) => self.cpy(AddressMode::Zeropage),
+            (0xC, 0x5) => self.cmp(AddressMode::Zeropage),
+            (0xC, 0x6) => self.dec(AddressMode::Zeropage),
+            (0xC, 0x8) => self.iny(AddressMode::Implied),
+            (0xC, 0x9) => self.cmp(AddressMode::Immediate),
+            (0xC, 0xC) => self.cpy(AddressMode::Absolute),
+            (0xC, 0xD) => self.cmp(AddressMode::Absolute),
+            (0xC, 0xA) => self.dex(AddressMode::Implied),
+            (0xC, 0xE) => self.dec(AddressMode::Absolute),
+            (0xD, 0x0) => self.bne(AddressMode::Relative),
+            (0xD, 0x1) => self.cmp(AddressMode::IndirectY),
+            (0xD, 0x5) => self.cmp(AddressMode::ZeropageX),
+            (0xD, 0x6) => self.dec(AddressMode::ZeropageX),
+            (0xD, 0x8) => self.cld(AddressMode::Implied),
+            (0xD, 0x9) => self.cmp(AddressMode::AbsoluteY),
+            (0xD, 0xD) => self.cmp(AddressMode::AbsoluteX),
+            (0xD, 0xE) => self.dec(AddressMode::AbsoluteX),
+            (0xE, 0x0) => self.cpx(AddressMode::Immediate),
+            (0xE, 0x1) => self.sbc(AddressMode::XIndirect),
+            (0xE, 0x4) => self.cpx(AddressMode::Zeropage),
+            (0xE, 0x5) => self.sbc(AddressMode::Zeropage),
+            (0xE, 0x6) => self.inc(AddressMode::Zeropage),
+            (0xE, 0x8) => self.inx(AddressMode::Implied),
+            (0xE, 0x9) => self.sbc(AddressMode::Immediate),
+            (0xE, 0xA) => self.nop(AddressMode::Implied),
+            (0xE, 0xC) => self.cpx(AddressMode::Absolute),
+            (0xE, 0xD) => self.sbc(AddressMode::Absolute),
+            (0xE, 0xE) => self.inc(AddressMode::Absolute),
+            (0xF, 0x0) => self.beq(AddressMode::Relative),
+            (0xF, 0x1) => self.sbc(AddressMode::IndirectY),
+            (0xF, 0x5) => self.sbc(AddressMode::ZeropageX),
+            (0xF, 0x8) => self.sed(AddressMode::Implied),
+            (0xF, 0x9) => self.sbc(AddressMode::AbsoluteY),
+            (0xF, 0xD) => self.sbc(AddressMode::AbsoluteX),
+            (0xF, 0x6) => self.inc(AddressMode::ZeropageX),
+            (0xF, 0xE) => self.inc(AddressMode::AbsoluteX),
+            _ => {}
         }
+    }
+
+    /// ======================
+    /// TRANSFER INSTRUCTIONS
+    /// ======================
+
+    // load accumulator
+    fn lda(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("lda");
+        };
+    }
+
+    // load X
+    fn ldx(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("ldx");
+        }
+    }
+
+    // load Y
+    fn ldy(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("ldy");
+        }
+    }
+
+    // store accumulator
+    fn sta(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sta");
+        }
+    }
+
+    // store X
+    fn stx(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("stx");
+        }
+    }
+
+    // store Y
+    fn sty(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sty");
+        }
+    }
+
+    // transfer accumulator to X
+    fn tax(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("tax");
+        }
+    }
+
+    // transfer accumulator to Y
+    fn tay(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("tay");
+        }
+    }
+
+    // transfer stack pointer to X
+    fn tsx(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("tsx");
+        }
+    }
+
+    // transfer X to accumulator
+    fn txa(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("txa");
+        }
+    }
+
+    // transfer X to stack pointer
+    fn txs(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("txs");
+        }
+    }
+
+    // transfer Y to accumulator
+    fn tya(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("tya");
+        }
+    }
+
+    /// ======================
+    /// STACK INSTRUCTIONS
+    /// ======================
+
+    // push accumulator
+    fn pha(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("pha");
+        }
+    }
+
+    // push processor status (SR)
+    fn php(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("php");
+        }
+    }
+
+    // pull accumulator
+    fn pla(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("pla");
+        }
+    }
+
+    // pull processor status (SR)
+    fn plp(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("plp");
+        };
+    }
+
+    /// ======================
+    /// DECREMENTS & INCREMENTS
+    /// ======================
+
+    // decrement
+    fn dec(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("dec");
+        };
+    }
+
+    // decrement X
+    fn dex(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("dex");
+        };
+    }
+
+    // decrement Y
+    fn dey(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("dey");
+        };
+    }
+
+    // increment
+    fn inc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("inc");
+        };
+    }
+
+    // increment X
+    fn inx(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("inx");
+        };
+    }
+
+    // increment Y
+    fn iny(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("iny");
+        };
+    }
+
+    /// ======================
+    /// ARITHMETIC OPERATIONS
+    /// ======================
+
+    // add with carry
+    fn adc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("adc");
+        };
+    }
+
+    // subtract with carry
+    fn sbc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sbc");
+        };
+    }
+
+    /// ======================
+    /// ALOGICAL OPERATIONS
+    /// ======================
+
+    // and (with accumulator)
+    fn and(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("and")
+        }
+        let a = self.get_address(addr);
+        self.acc &= a;
+    }
+
+    // exclusive or (with accumulator)
+    fn eor(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("eor")
+        }
+    }
+
+    // or with accumulator
+    fn ora(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("ora");
+        };
+    }
+
+    /// ======================
+    /// SHIFT & ROTATE INSTRUCTIONS
+    /// ======================
+
+    // arithmetic shift left
+    fn asl(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("asl");
+        };
+    }
+
+    // logical shift right
+    fn lsr(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("lsr");
+        };
+    }
+
+    // rotate left
+    fn rol(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("rol");
+        };
+    }
+
+    // rotate right
+    fn ror(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("ror");
+        };
+    }
+
+    /// ======================
+    /// FLAG INSTRUCTIONS
+    /// ======================
+
+    // clear carry
+    fn clc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("clc");
+        };
+    }
+
+    // clear decimal
+    fn cld(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("cld");
+        };
+    }
+
+    // clear interrupt disable
+    fn cli(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("cli");
+        };
+    }
+
+    // clear overflow
+    fn clv(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("clv");
+        };
+    }
+
+    fn sec(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sec");
+        };
+    }
+
+    // set decimal
+    fn sed(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sed");
+        };
+    }
+
+    // set interrupt disable
+    fn sei(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("sei");
+        };
+    }
+
+    /// ======================
+    /// COMPARISON
+    /// ======================
+
+    // compare (with accumulator)
+    fn cmp(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("cmp");
+        };
+    }
+
+    // compare with X
+    fn cpx(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("cpx");
+        };
+    }
+
+    // compare with Y
+    fn cpy(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("cpy");
+        };
+    }
+
+    /// ======================
+    /// CONDITIONAL BRANCH INSTRUCTION
+    /// ======================
+
+    // branch on carry clear
+    fn bcc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bcc");
+        };
+    }
+
+    // branch on carry set
+    fn bcs(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bcs");
+        };
+    }
+
+    // branch on equal (zero set)
+    fn beq(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("beq");
+        };
+    }
+
+    // branch on minus (negative set)
+    fn bmi(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bmi");
+        };
+    }
+
+    // branch on not equal (zero clear)
+    fn bne(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bne");
+        };
+    }
+
+    // branch on plus (negative clear)
+    fn bpl(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bpl");
+        };
+    }
+
+    // branch on overflow clear
+    fn bvc(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bvc");
+        };
+    }
+
+    // branch on overflow set
+    fn bvs(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bvs");
+        };;
+    }
+
+    /// ======================
+    /// JUMP & SUBROUTINES
+    /// ======================
+
+    // jump
+    fn jmp(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("jmp");
+        };
+    }
+
+    // jump subroutine
+    fn jsr(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("jsr");
+        };
+    }
+
+    // return from subroutine
+    fn rts(&mut self) {
+        if DEBUGLOG {
+            println!("rts");
+        }
+        self.pc += 1;
+    }
+
+    /// ======================
+    /// INTERRUPTS
+    /// ======================
+
+    // break / interrupt
+    /// Force Break
+    fn brk(&mut self) {
+        if DEBUGLOG {
+            println!("brk")
+        }
+        self.push_stack(self.memory[(self.pc + 2) as usize]);
+        self.f = Flag::B;
+    }
+
+    // return from interrupt
+    fn rti(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("rti");
+        };;
+    }
+
+    /// ======================
+    /// OTHER
+    /// ======================
+
+    // bit test
+    fn bit(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("bit");
+        };
+    }
+
+    // no operation
+    fn nop(&mut self, addr: AddressMode) {
+        if DEBUGLOG {
+            println!("nop");
+        };
     }
 }
 
@@ -504,5 +825,25 @@ fn main() {
 
     loop {
         c.execute_cycle();
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use crate::Chip;
+
+    #[test]
+    fn test_working() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+
+    #[test]
+    fn load_accumulator_immediate_mode() {
+        let mut c = Chip::new();
+
+        c.memory[512] = 0x49;
+        c.memory[513] = 0x01;
     }
 }

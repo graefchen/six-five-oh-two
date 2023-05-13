@@ -15,3 +15,4 @@ A bad MOS 6502 emulator
 * [10] http://www.6502.org/
 * [11] https://www.middle-engine.com/blog/posts/2020/06/23/programming-the-nes-the-6502-in-detail
 * [12] https://github.com/f0lg0/6502
+* [13] https://www.nesdev.org/obelisk-6502-guide/addressing.html
