@@ -8,7 +8,8 @@ const DEBUGLOG: bool = false;
 
 const MEMORY: usize = 65536;
 
-// The flag for the flag in the Chip
+// The flag's for the flag in the Chip
+// defined as u8 so to or them
 const N: u8 = 0x80; // [1000 0000] negative
 const V: u8 = 0x40; // [0100 0000] overflow
                     // [0010 0000] Reserved
@@ -16,7 +17,7 @@ const B: u8 = 0x10; // [0001 0000] break
 const D: u8 = 0x08; // [0000 1000] decimale
 const I: u8 = 0x04; // [0000 0100] interrpt disable
 const Z: u8 = 0x02; // [0000 0010] zero
-const C: u8 = 0x00; // [0000 0001] carry
+const C: u8 = 0x01; // [0000 0001] carry
 
 #[derive(Debug)]
 enum AddressMode {
@@ -48,7 +49,6 @@ struct Chip {
     pub sp: u8,
     // Program Counter:
     pub pc: u16,
-    // TODO: Putting Memory in it's own struct
     // Memory:
     // RESERVED: 256 bytes 0x0000 to 0x00FF -> Zero Page
     // RESERVED: 256 bytes 0x0100 to 0x01FF -> System Stack
@@ -75,103 +75,137 @@ impl Chip {
     /// =====================
 
     fn push_stack(&mut self, address: u8) {
+        if DEBUGLOG {
+            println!("push_stack");
+        }
         self.memory[0x0100 + self.sp as usize] = address;
-        // self.sp += 1;
+        self.sp += 1;
     }
 
-    fn pop_stack(&mut self) {
-        self.memory[0x0100 + self.sp as usize] = 0;
+    fn pop_stack(&mut self) -> u8 {
+        if DEBUGLOG {
+            println!("pop_stack");
+        }
         self.sp -= 1;
+        let data = self.memory[0x0100 + self.sp as usize];
+        data
+    }
+
+    fn read_byte(&mut self, address: u16) -> u8 {
+        if DEBUGLOG {
+            println!("read_byte");
+        }
+        self.memory[(address) as usize]
     }
 
     fn fetch_byte(&mut self) -> u8 {
+        if DEBUGLOG {
+            println!("fetch_byte");
+        }
         let data = self.memory[(self.pc) as usize];
         self.pc += 1;
         data
     }
 
-    fn read_byte(&mut self, address: u16) -> u8 {
-        self.memory[(address) as usize]
+    fn read_word(&mut self, address: u16) -> u16 {
+        if DEBUGLOG {
+            println!("read_word");
+        }
+        let b1 = self.read_byte(address);
+        let b2 = self.read_byte(address + 1);
+        self.bytes_to_word(b1, b2)
     }
 
-    fn get_address(&mut self, addr: AddressMode) -> u8 {
+    fn fetch_word(&mut self) -> u16 {
+        if DEBUGLOG {
+            println!("fetch_word");
+        }
+        let ll = self.fetch_byte();
+        let hh = self.fetch_byte();
+        (ll as u16) + ((hh as u16) << 8)
+    }
+
+    fn write_word(&mut self, word: u16, address: u16) {
+        if DEBUGLOG {
+            println!("write_word");
+        }
+        let (ll, hh) = self.word_to_bytes(word);
+        self.memory[address as usize] = ll;
+        self.memory[(address + 1) as usize] = hh;
+    }
+
+    fn word_to_bytes(&self, word: u16) -> (u8, u8) {
+        ( word as u8 & 0xFF , (word >> 8) as u8 )
+    }
+
+    fn bytes_to_word(&self, ll: u8, hh: u8) -> u16 {
+        (ll as u16) + ((hh as u16) << 8)
+    }
+
+    fn get_address(&mut self, addr: AddressMode) -> u16 {
         match addr {
             AddressMode::Immediate => {
-                return self.fetch_byte();
+                return self.pc;
             }
             AddressMode::Absolute => {
-                let ll = self.fetch_byte();
-                let hh = self.fetch_byte();
-                let address = (ll as u16) + ((hh as u16) << 8);
-                return self.read_byte(address);
+                let address = self.fetch_word();
+                return address;
             }
             AddressMode::Zeropage => {
                 let ll = self.fetch_byte();
                 let address = ll as u16;
-                return self.read_byte(address);
+                return address;
             }
             AddressMode::AbsoluteX => {
-                let ll = self.fetch_byte();
-                let hh = self.fetch_byte();
-                let address = (ll as u16) + ((hh as u16) << 8);
+                let address = self.fetch_word();
                 let x = self.rx;
-                return self.read_byte(address) + x;
+                return address + x as u16;
             }
             AddressMode::AbsoluteY => {
-                let ll = self.fetch_byte();
-                let hh = self.fetch_byte();
-                let address = (ll as u16) + ((hh as u16) << 8);
+                let address = self.fetch_word();
                 let y = self.ry;
-                return self.read_byte(address) + y;
+                return address + y as u16;
             }
             AddressMode::ZeropageX => {
                 let ll = self.fetch_byte();
                 let address = ll as u16;
                 let x = self.rx;
-                return self.read_byte(address) + x;
+                return address + x as u16;
             }
             AddressMode::ZeropageY => {
                 let ll = self.fetch_byte();
                 let address = ll as u16;
                 let y = self.ry;
-                return self.read_byte(address) + y;
+                return address + y as u16;
             }
             AddressMode::Indirect => {
-                let ll = self.fetch_byte();
-                let hh = self.fetch_byte();
-                let address = (ll as u16) + ((hh as u16) << 8);
-                let ll_2 = self.read_byte(address);
-                let hh_2 = self.memory[(address + 1) as usize];
-                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8);
-                return self.read_byte(address_2);
+                let address = self.fetch_word();
+                let address2 = self.read_word(address);
+                return address2;
             }
             AddressMode::XIndirect => {
                 let ll = self.fetch_byte();
                 let x = self.rx;
                 let address = (ll + x) as u16;
-                let ll_2 = self.read_byte(address);
-                let hh_2 = self.memory[(address + 1) as usize];
-                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8);
-                return self.read_byte(address_2);
+                let address2 = self.read_word(address);
+                return address2;
             }
             AddressMode::IndirectY => {
                 let ll = self.fetch_byte();
                 let y = self.ry;
                 let address = ll as u16;
-                let ll_2 = self.read_byte(address);
-                let hh_2 = self.memory[(address + 1) as usize];
-                let address_2 = (ll_2 as u16) + ((hh_2 as u16) << 8) + y as u16;
-                return self.read_byte(address_2);
+                let address2 = self.read_word(address) + y as u16;
+                return address2;
             }
             AddressMode::Relative => {
                 let off = self.read_byte(self.pc);
-                return off;
+                return off as u16;
             }
             _ => { return 0; }
         }
     }
 
-    pub fn load_prog(&mut self, prog: Vec<u8>) {
+    pub fn load_program(&mut self, prog: Vec<u8>) {
         for i in 0..prog.len() {
             self.memory[0x200 + i] = prog[i];
         }
@@ -239,7 +273,7 @@ impl Chip {
             (0x1, 0x9) => self.ora(AddressMode::AbsoluteY),
             (0x1, 0xD) => self.ora(AddressMode::AbsoluteX),
             (0x1, 0xE) => self.asl(AddressMode::AbsoluteX),
-            (0x2, 0x0) => self.jsr(AddressMode::Absolute),
+            (0x2, 0x0) => self.jsr(),
             (0x2, 0x4) => self.bit(AddressMode::Zeropage),
             (0x2, 0x1) => self.and(AddressMode::XIndirect),
             (0x2, 0x5) => self.and(AddressMode::Zeropage),
@@ -387,7 +421,8 @@ impl Chip {
             println!("lda");
         };
         self.f = N | Z;
-        self.acc = self.get_address(addr);
+        let address = self.get_address(addr);
+        self.acc = self.read_byte(address);
     }
 
     // load X
@@ -395,7 +430,9 @@ impl Chip {
         if DEBUGLOG {
             println!("ldx");
         }
-        todo!("ldx");
+        self.f = N | Z;
+        let address = self.get_address(addr);
+        self.rx = self.read_byte(address);
     }
 
     // load Y
@@ -403,7 +440,9 @@ impl Chip {
         if DEBUGLOG {
             println!("ldy");
         }
-        todo!("ldy");
+        self.f = N | Z;
+        let address = self.get_address(addr);
+        self.ry = self.read_byte(address);
     }
 
     // store accumulator
@@ -595,8 +634,9 @@ impl Chip {
         if DEBUGLOG {
             println!("and")
         }
-        let a = self.get_address(addr);
-        self.acc &= a;
+        let address = self.get_address(addr);
+        let and = self.read_byte(address);
+        self.acc &= and;
         todo!("and");
     }
 
@@ -816,15 +856,26 @@ impl Chip {
         if DEBUGLOG {
             println!("jmp");
         }
-        todo!("jmp");
+        self.pc = self.get_address(addr);
     }
 
     // jump subroutine
-    fn jsr(&mut self, addr: AddressMode) {
+    fn jsr(&mut self) {
         if DEBUGLOG {
             println!("jsr");
         }
-        todo!("jsr");
+        let subaddr = self.fetch_word();
+        // The write_word function is more or less the same as the
+        // Used push_stack functions...
+        // I just prefer the push stack a little bit more
+        // Else it does exactly the same job
+        // self.write_word(self.pc, self.sp as u16);
+        // self.sp += 2;
+        let (ll, hh) = self.word_to_bytes(self.pc);
+        self.push_stack(ll);
+        self.push_stack(hh);
+
+        self.pc = subaddr;
     }
 
     // return from subroutine
@@ -832,8 +883,16 @@ impl Chip {
         if DEBUGLOG {
             println!("rts");
         }
-        self.pc += 1;
-        todo!("rts");
+        // The read_word function is more or less the same as the
+        // Used pop_stack functions...
+        // I just prefer the pop stack a little bit more
+        // Else it does exactly the same job
+        // self.sp -= 2;
+        // self.pc = self.read_word(self.sp as u16);
+        let hh = self.pop_stack();
+        let ll = self.pop_stack();
+        self.bytes_to_word(ll, hh);
+        self.pc = self.bytes_to_word(ll, hh);
     }
 
     /// ======================
@@ -888,22 +947,22 @@ fn main() {
     c.load_exe("bin/6502_functional_test.bin".to_string())
         .unwrap();
 
-    loop {
-        c.execute_cycle();
-    }
+    // loop {
+    //     c.execute_cycle();
+    // }
 }
 
 
 #[cfg(test)]
 mod load_accumulator {
-    use crate::Chip;
+    use crate::*;
 
     #[test]
     fn immediate_mode() {
         let mut c = Chip::new();
 
         let prog: Vec<u8> = [0xA9, 0x01].to_vec();
-        c.load_prog(prog);
+        c.load_program(prog);
 
         c.execute_cycle();
         assert_eq!(0x01, c.acc);
@@ -915,7 +974,7 @@ mod load_accumulator {
 
         let prog: Vec<u8> = [0xA5, 0x01].to_vec();
         c.memory[0x01] = 0x12;
-        c.load_prog(prog);
+        c.load_program(prog);
 
         c.execute_cycle();
         assert_eq!(0x12, c.acc);
@@ -926,10 +985,17 @@ mod load_accumulator {
 
     // }
     
-    // #[test]
-    // fn absolute_mode() {
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
 
-    // }
+        let prog: Vec<u8> = [0xAD, 0xF0, 0xFF].to_vec();
+        c.memory[0xFFF0] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.acc);
+    }
 
     // #[test]
     // fn absolute_x_mode() {
@@ -950,4 +1016,207 @@ mod load_accumulator {
     // fn indirect_y_mode() {
 
     // }
+
+    #[test]
+    fn flags() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA9, 0x01].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(N | Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod load_x {
+    use crate::*;
+
+    #[test]
+    fn immediate_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA2, 0x01].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x01, c.rx);
+    }
+
+    #[test]
+    fn zeropage_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA6, 0x01].to_vec();
+        c.memory[0x01] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.rx);
+    }
+
+    // #[test]
+    // fn zeropage_y_mode() {
+
+    // }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xAE, 0xF0, 0xFF].to_vec();
+        c.memory[0xFFF0] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.rx);
+    }
+
+    // #[test]
+    // fn absolute_y_mode() {
+
+    // }
+
+    #[test]
+    fn flags() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA2, 0x01].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(N | Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod load_y {
+    use crate::*;
+
+    #[test]
+    fn immediate_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA0, 0x01].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x01, c.ry);
+    }
+
+    #[test]
+    fn zeropage_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA4, 0x01].to_vec();
+        c.memory[0x01] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.ry);
+    }
+
+    // #[test]
+    // fn zeropage_x_mode() {
+
+    // }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xAC, 0xF0, 0xFF].to_vec();
+        c.memory[0xFFF0] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.ry);
+    }
+
+    // #[test]
+    // fn absolute_x_mode() {
+
+    // }
+
+    #[test]
+    fn flags() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xA0, 0x01].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(N | Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod jump {
+    use crate::*;
+
+    #[test]
+    fn to_new_location_absolute() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x4C, 0x40, 0x42].to_vec();
+        c.load_program(prog);
+        c.memory[0x4240] = 0xA9;
+        c.memory[0x4241] = 0xFF;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0xFF, c.acc);
+    }
+
+    #[test]
+    fn to_new_location_indirect() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x6C, 0x82, 0xFF].to_vec();
+        c.load_program(prog);
+        c.memory[0x4240] = 0xA9;
+        c.memory[0x4241] = 0xFF;
+        c.memory[0xFF82] = 0x40;
+        c.memory[0xFF83] = 0x42;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0xFF, c.acc);
+    }
+
+    #[test]
+    fn to_new_location_saving_return_address() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x20, 0x40, 0x42].to_vec();
+        c.load_program(prog);
+        c.memory[0x4240] = 0xA9;
+        c.memory[0x4241] = 0xFF;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0xFF, c.acc);
+        assert_eq!(c.memory[0x0100], 0x03);
+        assert_eq!(c.memory[0x0101], 0x02);
+    }
+
+    #[test]
+    fn return_jump() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x20, 0x40, 0x42, 0xA9, 0xF0].to_vec();
+        c.load_program(prog);
+        c.memory[0x4240] = 0xA9;
+        c.memory[0x4241] = 0xFF;
+        c.memory[0x4242] = 0x60;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0xFF, c.acc);
+        c.execute_cycle();
+        assert_eq!(0xF0, c.acc);
+    }
 }
