@@ -1,3 +1,4 @@
 {
     "editor.minimap.size": "fit",
+    "rust-analyzer.lru.capacity": 10000
 }

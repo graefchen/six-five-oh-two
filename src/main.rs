@@ -1,4 +1,7 @@
-use core::panic;
+// TODO: MORE TESTS
+// TODO: MORE COMMENTS
+// TODO: MORE DOCUMENTATION
+
 // Imports for reading a file
 use std::fs::File;
 use std::io;
@@ -15,11 +18,11 @@ const V: u8 = 0x40; // [0100 0000] overflow
                     // [0010 0000] Reserved
 const B: u8 = 0x10; // [0001 0000] break
 const D: u8 = 0x08; // [0000 1000] decimale
-const I: u8 = 0x04; // [0000 0100] interrpt disable
+const I: u8 = 0x04; // [0000 0100] interupt disable
 const Z: u8 = 0x02; // [0000 0010] zero
 const C: u8 = 0x01; // [0000 0001] carry
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 enum AddressMode {
     Accumulator,
     Absolute,
@@ -30,7 +33,6 @@ enum AddressMode {
     Indirect,
     XIndirect,
     IndirectY,
-    Relative,
     Zeropage,
     ZeropageX,
     ZeropageY,
@@ -74,6 +76,10 @@ impl Chip {
         }
     }
 
+    pub fn startup(&mut self, address: u16) {
+        self.pc = self.read_word(address);
+    }
+
     /// =====================
     /// Helper functions
     /// =====================
@@ -97,14 +103,14 @@ impl Chip {
 
     fn read_byte(&mut self, address: u16) -> u8 {
         if DEBUGLOG {
-            println!("read_byte");
+            println!("read_byte at position {:X}", address);
         }
         self.memory[(address) as usize]
     }
 
     fn fetch_byte(&mut self) -> u8 {
         if DEBUGLOG {
-            println!("fetch_byte");
+            println!("fetch_byte at position {:X}", self.pc);
         }
         let data = self.memory[(self.pc) as usize];
         self.pc += 1;
@@ -120,7 +126,7 @@ impl Chip {
 
     fn read_word(&mut self, address: u16) -> u16 {
         if DEBUGLOG {
-            println!("read_word");
+            println!("read_word at position {:X} and {:X}", address, address + 1);
         }
         let b1 = self.read_byte(address);
         let b2 = self.read_byte(address + 1);
@@ -129,7 +135,7 @@ impl Chip {
 
     fn fetch_word(&mut self) -> u16 {
         if DEBUGLOG {
-            println!("fetch_word");
+            println!("fetch_word at position {:X} and {:X}", self.pc, self.pc + 1);
         }
         let ll = self.fetch_byte();
         let hh = self.fetch_byte();
@@ -153,20 +159,36 @@ impl Chip {
         (ll as u16) + ((hh as u16) << 8)
     }
 
-    fn  set_flags_zero_neg(&mut self, value: u8) {
+    fn  set_zero_neg_flags(&mut self, value: u8) {
         if value == 0 {
-            self.f |= Z;
+            self.f = Z;
         }
         if value > 0x80 {
-            self.f |= N;
+            self.f = N;
         }
     }
 
-    /// Returns the address depending on the given AddreessMode
+    /// Returns the address depending on the given AddressMode.
+    /// 
+    /// 
+    /// TODO: Refactor this into an own function that I do not need to use
+    ///       this weird algorithm in getting first the address and then
+    ///       reading from the address like:
+    /// ```rust
+    /// let address = get_address(addr);
+    /// let byte = read_byte(address);
+    /// ````
     fn get_address(&mut self, addr: AddressMode) -> u16 {
+        if DEBUGLOG {
+            println!("get_address with AddressMode: {:?}", addr);
+        }
         match addr {
             AddressMode::Immediate => {
-                return self.pc;
+                // Need to increment the pc
+                // Else it would not register that we have
+                // "read" the 
+                self.pc += 1;
+                return self.pc - 1;
             }
             AddressMode::Absolute => {
                 let address = self.fetch_word();
@@ -217,10 +239,6 @@ impl Chip {
                 let address2 = self.read_word(address) + y as u16;
                 return address2;
             }
-            AddressMode::Relative => {
-                let off = self.read_byte(self.pc);
-                return off as u16;
-            }
             _ => { return 0; }
         }
     }
@@ -262,13 +280,6 @@ impl Chip {
         // let bbb = (opcode & 0x1C) >> 3;
         // let cc = opcode & 0x03;
 
-        // If we are still on memory we should make stuff ...
-        if self.pc < (self.memory.len() - 0x206) as u16 {
-
-        } else {
-            panic!("We enter a loop");
-        }
-
         // opcodes
         let op_1 = (opcode & 0xF0) >> 4;
         let op_2 = opcode & 0x0F;
@@ -280,12 +291,12 @@ impl Chip {
             (0x0, 0x1) => self.ora(AddressMode::XIndirect),
             (0x0, 0x5) => self.ora(AddressMode::Zeropage),
             (0x0, 0x6) => self.asl(AddressMode::Zeropage),
-            (0x0, 0x8) => self.php(AddressMode::Implied),
+            (0x0, 0x8) => self.php(),
             (0x0, 0x9) => self.ora(AddressMode::Immediate),
             (0x0, 0xA) => self.asl(AddressMode::Accumulator),
             (0x0, 0xD) => self.ora(AddressMode::Absolute),
             (0x0, 0xE) => self.asl(AddressMode::Absolute),
-            (0x1, 0x0) => self.bpl(AddressMode::Relative),
+            (0x1, 0x0) => self.bpl(),
             (0x1, 0x1) => self.ora(AddressMode::IndirectY),
             (0x1, 0x5) => self.ora(AddressMode::ZeropageX),
             (0x1, 0x6) => self.asl(AddressMode::ZeropageX),
@@ -298,13 +309,13 @@ impl Chip {
             (0x2, 0x1) => self.and(AddressMode::XIndirect),
             (0x2, 0x5) => self.and(AddressMode::Zeropage),
             (0x2, 0x6) => self.rol(AddressMode::Zeropage),
-            (0x2, 0x8) => self.plp(AddressMode::Implied),
+            (0x2, 0x8) => self.plp(),
             (0x2, 0x9) => self.and(AddressMode::Immediate),
             (0x2, 0xA) => self.rol(AddressMode::Accumulator),
             (0x2, 0xC) => self.bit(AddressMode::Absolute),
             (0x2, 0xD) => self.and(AddressMode::Absolute),
             (0x2, 0xE) => self.rol(AddressMode::Absolute),
-            (0x3, 0x0) => self.bmi(AddressMode::Relative),
+            (0x3, 0x0) => self.bmi(),
             (0x3, 0x1) => self.and(AddressMode::IndirectY),
             (0x3, 0x5) => self.and(AddressMode::ZeropageX),
             (0x3, 0x6) => self.rol(AddressMode::ZeropageX),
@@ -312,17 +323,17 @@ impl Chip {
             (0x3, 0x9) => self.and(AddressMode::AbsoluteY),
             (0x3, 0xD) => self.and(AddressMode::AbsoluteX),
             (0x3, 0xE) => self.rol(AddressMode::AbsoluteX),
-            (0x4, 0x0) => self.rti(AddressMode::Implied),
+            (0x4, 0x0) => self.rti(),
             (0x4, 0x1) => self.eor(AddressMode::XIndirect),
             (0x4, 0x5) => self.eor(AddressMode::Zeropage),
             (0x4, 0x6) => self.lsr(AddressMode::Zeropage),
-            (0x4, 0x8) => self.pha(AddressMode::Implied),
+            (0x4, 0x8) => self.pha(),
             (0x4, 0x9) => self.eor(AddressMode::Immediate),
             (0x4, 0xA) => self.lsr(AddressMode::Accumulator),
             (0x4, 0xC) => self.jmp(AddressMode::Absolute),
             (0x4, 0xE) => self.lsr(AddressMode::Absolute),
             (0x4, 0xD) => self.eor(AddressMode::Absolute),
-            (0x5, 0x0) => self.bvc(AddressMode::Relative),
+            (0x5, 0x0) => self.bvc(),
             (0x5, 0x1) => self.eor(AddressMode::IndirectY),
             (0x5, 0x5) => self.eor(AddressMode::ZeropageX),
             (0x5, 0x6) => self.lsr(AddressMode::ZeropageX),
@@ -334,13 +345,13 @@ impl Chip {
             (0x6, 0x1) => self.adc(AddressMode::XIndirect),
             (0x6, 0x5) => self.adc(AddressMode::Zeropage),
             (0x6, 0x6) => self.ror(AddressMode::Zeropage),
-            (0x6, 0x8) => self.pla(AddressMode::Implied),
+            (0x6, 0x8) => self.pla(),
             (0x6, 0x9) => self.adc(AddressMode::Immediate),
             (0x6, 0xC) => self.jmp(AddressMode::Indirect),
             (0x6, 0xA) => self.ror(AddressMode::Accumulator),
             (0x6, 0xD) => self.adc(AddressMode::Absolute),
             (0x6, 0xE) => self.ror(AddressMode::Absolute),
-            (0x7, 0x0) => self.bvs(AddressMode::Relative),
+            (0x7, 0x0) => self.bvs(),
             (0x7, 0x1) => self.adc(AddressMode::IndirectY),
             (0x7, 0x5) => self.adc(AddressMode::ZeropageX),
             (0x7, 0x6) => self.ror(AddressMode::ZeropageX),
@@ -357,15 +368,15 @@ impl Chip {
             (0x8, 0xA) => self.txa(),
             (0x8, 0xD) => self.sta(AddressMode::Absolute),
             (0x8, 0xE) => self.stx(AddressMode::Absolute),
-            (0x9, 0x0) => self.bcc(AddressMode::Relative),
+            (0x9, 0x0) => self.bcc(),
             (0x9, 0x1) => self.sta(AddressMode::IndirectY),
             (0x9, 0x4) => self.sty(AddressMode::ZeropageX),
             (0x9, 0x5) => self.sta(AddressMode::ZeropageX),
             (0x9, 0x6) => self.stx(AddressMode::ZeropageY),
             (0x9, 0x8) => self.tya(),
             (0x9, 0x9) => self.sta(AddressMode::AbsoluteY),
-            (0x9, 0xD) => self.sta(AddressMode::AbsoluteX),
             (0x9, 0xA) => self.txs(),
+            (0x9, 0xD) => self.sta(AddressMode::AbsoluteX),
             (0xA, 0x0) => self.ldy(AddressMode::Immediate),
             (0xA, 0x1) => self.lda(AddressMode::XIndirect),
             (0xA, 0x2) => self.ldx(AddressMode::Immediate),
@@ -374,11 +385,11 @@ impl Chip {
             (0xA, 0x6) => self.ldx(AddressMode::Zeropage),
             (0xA, 0x8) => self.tay(),
             (0xA, 0x9) => self.lda(AddressMode::Immediate),
-            (0xA, 0xA) => self.tax(AddressMode::Implied),
+            (0xA, 0xA) => self.tax(),
             (0xA, 0xC) => self.ldy(AddressMode::Absolute),
             (0xA, 0xD) => self.lda(AddressMode::Absolute),
             (0xA, 0xE) => self.ldx(AddressMode::Absolute),
-            (0xB, 0x0) => self.bcs(AddressMode::Relative),
+            (0xB, 0x0) => self.bcs(),
             (0xB, 0x1) => self.lda(AddressMode::IndirectY),
             (0xB, 0x4) => self.ldy(AddressMode::ZeropageX),
             (0xB, 0x5) => self.lda(AddressMode::ZeropageX),
@@ -400,7 +411,7 @@ impl Chip {
             (0xC, 0xD) => self.cmp(AddressMode::Absolute),
             (0xC, 0xA) => self.dex(),
             (0xC, 0xE) => self.dec(AddressMode::Absolute),
-            (0xD, 0x0) => self.bne(AddressMode::Relative),
+            (0xD, 0x0) => self.bne(),
             (0xD, 0x1) => self.cmp(AddressMode::IndirectY),
             (0xD, 0x5) => self.cmp(AddressMode::ZeropageX),
             (0xD, 0x6) => self.dec(AddressMode::ZeropageX),
@@ -419,7 +430,7 @@ impl Chip {
             (0xE, 0xC) => self.cpx(AddressMode::Absolute),
             (0xE, 0xD) => self.sbc(AddressMode::Absolute),
             (0xE, 0xE) => self.inc(AddressMode::Absolute),
-            (0xF, 0x0) => self.beq(AddressMode::Relative),
+            (0xF, 0x0) => self.beq(),
             (0xF, 0x1) => self.sbc(AddressMode::IndirectY),
             (0xF, 0x5) => self.sbc(AddressMode::ZeropageX),
             (0xF, 0x8) => self.sed(AddressMode::Implied),
@@ -442,7 +453,7 @@ impl Chip {
         };
         let address = self.get_address(addr);
         self.acc = self.read_byte(address);
-        self.set_flags_zero_neg(self.acc);
+        self.set_zero_neg_flags(self.acc);
     }
 
     // load X
@@ -452,7 +463,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.rx = self.read_byte(address);
-        self.set_flags_zero_neg(self.rx);
+        self.set_zero_neg_flags(self.rx);
     }
 
     // load Y
@@ -462,7 +473,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.ry = self.read_byte(address);
-        self.set_flags_zero_neg(self.ry);
+        self.set_zero_neg_flags(self.ry);
     }
 
     // store accumulator
@@ -493,7 +504,7 @@ impl Chip {
     }
 
     // transfer accumulator to X
-    fn tax(&mut self, addr: AddressMode) {
+    fn tax(&mut self) {
         if DEBUGLOG {
             println!("tax");
         }
@@ -545,7 +556,7 @@ impl Chip {
     /// ======================
 
     // push accumulator
-    fn pha(&mut self, addr: AddressMode) {
+    fn pha(&mut self) {
         if DEBUGLOG {
             println!("pha");
         }
@@ -553,7 +564,7 @@ impl Chip {
     }
 
     // push processor status (SR)
-    fn php(&mut self, addr: AddressMode) {
+    fn php(&mut self) {
         if DEBUGLOG {
             println!("php");
         }
@@ -561,16 +572,16 @@ impl Chip {
     }
 
     // pull accumulator
-    fn pla(&mut self, addr: AddressMode) {
+    fn pla(&mut self) {
         if DEBUGLOG {
             println!("pla");
         }
         self.acc = self.pop_stack();
-        self.set_flags_zero_neg(self.acc);
+        self.set_zero_neg_flags(self.acc);
     }
 
     // pull processor status (SR)
-    fn plp(&mut self, addr: AddressMode) {
+    fn plp(&mut self) {
         if DEBUGLOG {
             println!("plp");
         }
@@ -590,7 +601,7 @@ impl Chip {
         let byte = self.read_byte(address);
         let ( res, _ ) = byte.overflowing_sub(1);
         self.write_byte(res, address);
-        self.set_flags_zero_neg(res);
+        self.set_zero_neg_flags(res);
     }
 
     // decrement X
@@ -599,7 +610,7 @@ impl Chip {
             println!("dex");
         }
         ( self.rx, _ ) = self.rx.overflowing_sub(1);
-        self.set_flags_zero_neg(self.rx);
+        self.set_zero_neg_flags(self.rx);
     }
 
     // decrement Y
@@ -608,7 +619,7 @@ impl Chip {
             println!("dey");
         }
         ( self.ry, _ ) = self.ry.overflowing_sub(1);
-        self.set_flags_zero_neg(self.ry);
+        self.set_zero_neg_flags(self.ry);
     }
 
     // increment
@@ -620,7 +631,7 @@ impl Chip {
         let byte = self.read_byte(address);
         let ( res, _ ) = byte.overflowing_add(1);
         self.write_byte(res, address);
-        self.set_flags_zero_neg(res);
+        self.set_zero_neg_flags(res);
     }
 
     // increment X
@@ -628,8 +639,8 @@ impl Chip {
         if DEBUGLOG {
             println!("inx");
         }
-        ( self.ry, _ ) = self.rx.overflowing_add(1);
-        self.set_flags_zero_neg(self.rx);
+        ( self.rx, _ ) = self.rx.overflowing_add(1);
+        self.set_zero_neg_flags(self.rx);
     }
 
     // increment Y
@@ -638,7 +649,7 @@ impl Chip {
             println!("iny");
         }
         ( self.ry, _ ) = self.ry.overflowing_add(1);
-        self.set_flags_zero_neg(self.ry);
+        self.set_zero_neg_flags(self.ry);
     }
 
     /// ======================
@@ -646,6 +657,7 @@ impl Chip {
     /// ======================
 
     // add with carry
+    // TODO: Some of the hardest functions
     fn adc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("adc");
@@ -654,6 +666,7 @@ impl Chip {
     }
 
     // subtract with carry
+    // TODO: Some of the hardest functions
     fn sbc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("sbc");
@@ -672,8 +685,9 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let and = self.read_byte(address);
+
         self.acc &= and;
-        self.set_flags_zero_neg(self.acc);
+        self.set_zero_neg_flags(self.acc);
     }
 
     // exclusive or (with accumulator)
@@ -681,7 +695,11 @@ impl Chip {
         if DEBUGLOG {
             println!("eor")
         }
-        todo!("eor");
+        let address = self.get_address(addr);
+        let eor = self.read_byte(address);
+
+        self.acc ^= eor;
+        self.set_zero_neg_flags(self.acc);
     }
 
     // or with accumulator
@@ -689,7 +707,11 @@ impl Chip {
         if DEBUGLOG {
             println!("ora");
         }
-        todo!("ora");
+        let address = self.get_address(addr);
+        let ora = self.read_byte(address);
+
+        self.acc |= ora;
+        self.set_zero_neg_flags(self.acc);
     }
 
     /// ======================
@@ -701,7 +723,19 @@ impl Chip {
         if DEBUGLOG {
             println!("asl");
         }
-        todo!("asl");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        match addr {
+            AddressMode::Accumulator => {
+                self.acc <<= 1;
+                self.set_zero_neg_flags(self.acc);
+            }
+            _ => {
+                let res = byte << 1;
+                self.write_byte(res, address);
+                self.set_zero_neg_flags(res);
+            }
+        }
     }
 
     // logical shift right
@@ -709,7 +743,19 @@ impl Chip {
         if DEBUGLOG {
             println!("lsr");
         }
-        todo!("lsr");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        match addr {
+            AddressMode::Accumulator => {
+                self.acc >>= 1;
+                self.set_zero_neg_flags(self.acc);
+            }
+            _ => {
+                let res = byte >> 1;
+                self.write_byte(res, address);
+                self.set_zero_neg_flags(res);
+            }
+        }
     }
 
     // rotate left
@@ -717,7 +763,19 @@ impl Chip {
         if DEBUGLOG {
             println!("rol");
         }
-        todo!("rol");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        match addr {
+            AddressMode::Accumulator => {
+                self.acc = self.acc.rotate_left(1);
+                self.set_zero_neg_flags(self.acc);
+            }
+            _ => {
+                let res = byte.rotate_left(1);
+                self.write_byte(res, address);
+                self.set_zero_neg_flags(res);
+            }
+        }
     }
 
     // rotate right
@@ -725,7 +783,19 @@ impl Chip {
         if DEBUGLOG {
             println!("ror");
         }
-        todo!("ror");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        match addr {
+            AddressMode::Accumulator => {
+                self.acc = self.acc.rotate_right(1);
+                self.set_zero_neg_flags(self.acc);
+            }
+            _ => {
+                let res = byte.rotate_right(1);
+                self.write_byte(res, address);
+                self.set_zero_neg_flags(res);
+            }
+        }
     }
 
     /// ======================
@@ -796,7 +866,12 @@ impl Chip {
         if DEBUGLOG {
             println!("cmp");
         }
-        todo!("cmp");
+        let address = self.get_address(addr);
+        let (res, _) = self.acc.overflowing_sub(self.read_byte(address));
+        self.set_zero_neg_flags(res);
+        if self.acc >= res {
+            self.f = C;
+        }
     }
 
     // compare with X
@@ -820,7 +895,7 @@ impl Chip {
     /// ======================
 
     // branch on carry clear
-    fn bcc(&mut self, addr: AddressMode) {
+    fn bcc(&mut self) {
         if DEBUGLOG {
             println!("bcc");
         }
@@ -828,7 +903,7 @@ impl Chip {
     }
 
     // branch on carry set
-    fn bcs(&mut self, addr: AddressMode) {
+    fn bcs(&mut self) {
         if DEBUGLOG {
             println!("bcs");
         }
@@ -836,7 +911,7 @@ impl Chip {
     }
 
     // branch on equal (zero set)
-    fn beq(&mut self, addr: AddressMode) {
+    fn beq(&mut self) {
         if DEBUGLOG {
             println!("beq");
         }
@@ -844,7 +919,7 @@ impl Chip {
     }
 
     // branch on minus (negative set)
-    fn bmi(&mut self, addr: AddressMode) {
+    fn bmi(&mut self) {
         if DEBUGLOG {
             println!("bmi");
         }
@@ -852,15 +927,19 @@ impl Chip {
     }
 
     // branch on not equal (zero clear)
-    fn bne(&mut self, addr: AddressMode) {
+    fn bne(&mut self) {
         if DEBUGLOG {
             println!("bne");
         }
-        todo!("bne");
+        let offset = self.fetch_byte();
+        let zf = self.f & Z;
+        if zf != Z {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on plus (negative clear)
-    fn bpl(&mut self, addr: AddressMode) {
+    fn bpl(&mut self) {
         if DEBUGLOG {
             println!("bpl");
         }
@@ -868,7 +947,7 @@ impl Chip {
     }
 
     // branch on overflow clear
-    fn bvc(&mut self, addr: AddressMode) {
+    fn bvc(&mut self) {
         if DEBUGLOG {
             println!("bvc");
         }
@@ -876,7 +955,7 @@ impl Chip {
     }
 
     // branch on overflow set
-    fn bvs(&mut self, addr: AddressMode) {
+    fn bvs(&mut self) {
         if DEBUGLOG {
             println!("bvs");
         }
@@ -908,8 +987,8 @@ impl Chip {
         // self.write_word(self.pc, self.sp as u16);
         // self.sp += 2;
         let (ll, hh) = self.word_to_bytes(self.pc);
-        self.push_stack(ll);
         self.push_stack(hh);
+        self.push_stack(ll);
 
         self.pc = subaddr;
     }
@@ -925,8 +1004,8 @@ impl Chip {
         // Else it does exactly the same job
         // self.sp -= 2;
         // self.pc = self.read_word(self.sp as u16);
-        let hh = self.pop_stack();
         let ll = self.pop_stack();
+        let hh = self.pop_stack();
         self.bytes_to_word(ll, hh);
 
         self.pc = self.bytes_to_word(ll, hh);
@@ -942,17 +1021,24 @@ impl Chip {
         if DEBUGLOG {
             println!("brk")
         }
-        self.push_stack(self.memory[(self.pc + 2) as usize]);
+        let (ll, hh) = self.word_to_bytes(self.pc);
+        self.push_stack(hh);
+        self.push_stack(ll);
         self.f = B;
-        todo!("brk");
+        self.push_stack(self.f);
+        self.pc = self.read_word(0xFFFE);
     }
 
     // return from interrupt
-    fn rti(&mut self, addr: AddressMode) {
+    fn rti(&mut self) {
         if DEBUGLOG {
             println!("rti");
         }
-        todo!("rti");
+        let ll = self.pop_stack();
+        let hh = self.pop_stack();
+        self.pop_stack();
+        self.pc = self.bytes_to_word(ll, hh);
+        self.f = self.pop_stack() ^ B;
     }
 
     /// ======================
@@ -964,7 +1050,10 @@ impl Chip {
         if DEBUGLOG {
             println!("bit");
         }
-        todo!("bit");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        let op = byte | (N & V);
+        self.f = op & self.acc;
     }
 
     // no operation
@@ -976,6 +1065,8 @@ impl Chip {
         // because what says truly more than
         // no operation than simply
         // not doing anything?
+        // We could also do a wait here...
+        // I will see in the future!
     }
 }
 
@@ -986,11 +1077,13 @@ fn main() {
 
     c.load_exe("bin/6502_functional_test.bin".to_string())
         .unwrap();
+    c.startup(0x200);
 
-    // loop {
-    //     c.execute_cycle();
-    // }
+    loop {
+        c.execute_cycle();
+    }
 }
+
 
 /// ==========================
 /// TRANSFER INSTRUCTIONS TEST
@@ -1004,6 +1097,8 @@ mod load_accumulator {
     fn immediate_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA #$1
         let prog: Vec<u8> = [0xA9, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1015,6 +1110,8 @@ mod load_accumulator {
     fn zeropage_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA $01
         let prog: Vec<u8> = [0xA5, 0x01].to_vec();
         c.memory[0x01] = 0x12;
         c.load_program(prog);
@@ -1027,6 +1124,8 @@ mod load_accumulator {
     fn zeropage_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA $01,X
         let prog: Vec<u8> = [0xB5, 0x01].to_vec();
         c.rx = 0x01;
         c.memory[0x02] = 0x12;
@@ -1040,6 +1139,8 @@ mod load_accumulator {
     fn absolute_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA $FFF0
         let prog: Vec<u8> = [0xAD, 0xF0, 0xFF].to_vec();
         c.memory[0xFFF0] = 0x12;
         c.load_program(prog);
@@ -1052,6 +1153,8 @@ mod load_accumulator {
     fn absolute_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA $FFF0,X
         let prog: Vec<u8> = [0xBD, 0xF0, 0xFF].to_vec();
         c.rx = 0x2;
         c.memory[0xFFF2] = 0x12;
@@ -1065,6 +1168,8 @@ mod load_accumulator {
     fn absolute_y_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA $FFF0,Y
         let prog: Vec<u8> = [0xB9, 0xF0, 0xFF].to_vec();
         c.ry = 0x5;
         c.memory[0xFFF5] = 0x12;
@@ -1078,6 +1183,8 @@ mod load_accumulator {
     fn indirect_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA ($70,X)
         let prog: Vec<u8> = [0xA1, 0x70].to_vec();
         c.rx = 0x05;
         c.memory[0x75] = 0xA5;
@@ -1091,6 +1198,8 @@ mod load_accumulator {
     fn indirect_y_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA ($70),Y
         let prog: Vec<u8> = [0xB1, 0x70].to_vec();
         c.ry = 0x10;
         c.memory[0x70] = 0x43;
@@ -1106,6 +1215,8 @@ mod load_accumulator {
     fn flags() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDA #$01
         let prog: Vec<u8> = [0xA9, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1122,6 +1233,8 @@ mod load_x {
     fn immediate_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX #$01
         let prog: Vec<u8> = [0xA2, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1133,6 +1246,8 @@ mod load_x {
     fn zeropage_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX #01
         let prog: Vec<u8> = [0xA6, 0x01].to_vec();
         c.memory[0x01] = 0x12;
         c.load_program(prog);
@@ -1145,6 +1260,8 @@ mod load_x {
     fn zeropage_y_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX $01,Y
         let prog: Vec<u8> = [0xB6, 0x01].to_vec();
         c.ry = 0x4;
         c.memory[0x05] = 0x12;
@@ -1158,6 +1275,8 @@ mod load_x {
     fn absolute_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX $FFF0
         let prog: Vec<u8> = [0xAE, 0xF0, 0xFF].to_vec();
         c.memory[0xFFF0] = 0x12;
         c.load_program(prog);
@@ -1170,6 +1289,8 @@ mod load_x {
     fn absolute_y_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX %FFF0,Y
         let prog: Vec<u8> = [0xBE, 0xF0, 0xFF].to_vec();
         c.ry = 0x5;
         c.memory[0xFFF5] = 0x12;
@@ -1183,6 +1304,8 @@ mod load_x {
     fn flags() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDX #$01
         let prog: Vec<u8> = [0xA2, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1199,6 +1322,8 @@ mod load_y {
     fn immediate_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY #$01
         let prog: Vec<u8> = [0xA0, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1210,6 +1335,8 @@ mod load_y {
     fn zeropage_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY $01
         let prog: Vec<u8> = [0xA4, 0x01].to_vec();
         c.memory[0x01] = 0x12;
         c.load_program(prog);
@@ -1222,6 +1349,8 @@ mod load_y {
     fn zeropage_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY $01,Y
         let prog: Vec<u8> = [0xB4, 0x01].to_vec();
         c.rx = 0x0A;
         c.memory[0x0B] = 0x12;
@@ -1235,6 +1364,8 @@ mod load_y {
     fn absolute_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY $FFF0
         let prog: Vec<u8> = [0xAC, 0xF0, 0xFF].to_vec();
         c.memory[0xFFF0] = 0x12;
         c.load_program(prog);
@@ -1247,6 +1378,8 @@ mod load_y {
     fn absolute_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY $FFF0,X
         let prog: Vec<u8> = [0xBC, 0xF0, 0xFF].to_vec();
         c.rx = 0x2;
         c.memory[0xFFF2] = 0x12;
@@ -1260,6 +1393,8 @@ mod load_y {
     fn flags() {
         let mut c = Chip::new();
 
+        // Code:
+        // LDY #$01
         let prog: Vec<u8> = [0xA0, 0x01].to_vec();
         c.load_program(prog);
 
@@ -1275,7 +1410,7 @@ mod load_y {
 
 
 /// ==============================
-/// DECREMENNT & INCREMENNT TESTS
+/// DECREMENNT & INCREMENT TESTS
 /// ==============================
 
 #[cfg(test)]
@@ -1286,6 +1421,8 @@ mod decrement {
     fn zeropage_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEC $01
         let prog: Vec<u8> = [0xC6, 0x01].to_vec();
         c.memory[0x01] = 0x12;
         c.load_program(prog);
@@ -1298,6 +1435,8 @@ mod decrement {
     fn zeropage_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEC $01,X
         let prog: Vec<u8> = [0xD6, 0x01].to_vec();
         c.rx = 0x01;
         c.memory[0x02] = 0x13;
@@ -1311,6 +1450,8 @@ mod decrement {
     fn absolute_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEC $FFF0
         let prog: Vec<u8> = [0xCE, 0xF0, 0xFF].to_vec();
         c.memory[0xFFF0] = 0xAA;
         c.load_program(prog);
@@ -1323,6 +1464,8 @@ mod decrement {
     fn absolute_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEC $FFF0,X
         let prog: Vec<u8> = [0xDE, 0xF0, 0xF0].to_vec();
         c.rx = 0x03;
         c.memory[0xF0F3] = 0xAA;
@@ -1353,6 +1496,8 @@ mod decrement_x {
     fn implied() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEX
         let prog: Vec<u8> = [0xCA].to_vec();
         c.rx = 0x01;
         c.load_program(prog);
@@ -1365,6 +1510,8 @@ mod decrement_x {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEX
         let prog: Vec<u8> = [0xCA].to_vec();
         c.rx = 0x01;
         c.load_program(prog);
@@ -1382,6 +1529,8 @@ mod decrement_y {
     fn implied() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEY
         let prog: Vec<u8> = [0x88].to_vec();
         c.ry = 0x01;
         c.load_program(prog);
@@ -1394,6 +1543,8 @@ mod decrement_y {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEY
         let prog: Vec<u8> = [0x88].to_vec();
         c.ry = 0x01;
         c.load_program(prog);
@@ -1411,6 +1562,8 @@ mod increment {
     fn zeropage_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // INC $01
         let prog: Vec<u8> = [0xE6, 0x01].to_vec();
         c.memory[0x01] = 0x12;
         c.load_program(prog);
@@ -1423,6 +1576,8 @@ mod increment {
     fn zeropage_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // INC $01,X
         let prog: Vec<u8> = [0xF6, 0x01].to_vec();
         c.rx = 0x01;
         c.memory[0x02] = 0x14;
@@ -1436,6 +1591,8 @@ mod increment {
     fn absolute_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // INC $FFF0
         let prog: Vec<u8> = [0xEE, 0xF0, 0xFF].to_vec();
         c.memory[0xFFF0] = 0xAA;
         c.load_program(prog);
@@ -1448,6 +1605,8 @@ mod increment {
     fn absolute_x_mode() {
         let mut c = Chip::new();
 
+        // Code:
+        // INC $FFF0,X
         let prog: Vec<u8> = [0xFE, 0xF0, 0xF0].to_vec();
         c.rx = 0x03;
         c.memory[0xF0F3] = 0xAA;
@@ -1461,6 +1620,8 @@ mod increment {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // INC $01
         let prog: Vec<u8> = [0xE6, 0x01].to_vec();
         c.memory[0x01] = 0x01;
         c.load_program(prog);
@@ -1478,6 +1639,8 @@ mod increment_x {
     fn implied() {
         let mut c = Chip::new();
 
+        // Code:
+        // INX
         let prog: Vec<u8> = [0xE8].to_vec();
         c.rx = 0x11;
         c.load_program(prog);
@@ -1490,6 +1653,8 @@ mod increment_x {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // INX
         let prog: Vec<u8> = [0xE8].to_vec();
         c.ry = 0x01;
         c.load_program(prog);
@@ -1507,6 +1672,8 @@ mod increment_y {
     fn implied() {
         let mut c = Chip::new();
 
+        // Code:
+        // INY
         let prog: Vec<u8> = [0xC8].to_vec();
         c.ry = 0x02;
         c.load_program(prog);
@@ -1519,6 +1686,8 @@ mod increment_y {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // INY
         let prog: Vec<u8> = [0xC8].to_vec();
         c.ry = 0x01;
         c.load_program(prog);
@@ -1527,6 +1696,64 @@ mod increment_y {
         assert_ne!(Z, c.f);
     }
 }
+
+
+/// ==========================
+/// ARITHMETIC OPERATION TESTS
+/// ==========================
+
+
+
+/// ==========================
+/// LOGICAL TESTS
+/// ==========================
+
+
+
+/// ==========================
+/// SHIFT & ROTATE TESTS
+/// ==========================
+
+
+
+/// ==========================
+/// FLAG TESTS
+/// ==========================
+
+
+
+/// ==========================
+/// COMPARISON TESTS
+/// ==========================
+
+#[cfg(test)]
+mod branch {
+    use crate::*;
+
+    #[test]
+    fn not_equal_zero() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BNE $01
+        // LDA $01
+        let prog: Vec<u8> = [0xD0, 0x01, 0xA9, 0x01].to_vec();
+        c.load_program(prog);
+        c.f = N;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
+
+}
+
+
+/// ==========================
+/// CONDITIONAL BRANCH TESTS
+/// ==========================
+
+
 
 /// ==========================
 /// JUMP & SUBROUTINE TESTS
@@ -1540,6 +1767,9 @@ mod jump {
     fn to_new_location_absolute() {
         let mut c = Chip::new();
 
+        // Code:
+        // JMP $4240
+        // LDA #$FF
         let prog: Vec<u8> = [0x4C, 0x40, 0x42].to_vec();
         c.load_program(prog);
         c.memory[0x4240] = 0xA9;
@@ -1554,6 +1784,9 @@ mod jump {
     fn to_new_location_indirect() {
         let mut c = Chip::new();
 
+        // Code:
+        // JMP ($4FF82)
+        // LDA #$FF
         let prog: Vec<u8> = [0x6C, 0x82, 0xFF].to_vec();
         c.load_program(prog);
         c.memory[0x4240] = 0xA9;
@@ -1570,6 +1803,9 @@ mod jump {
     fn to_new_location_saving_return_address() {
         let mut c = Chip::new();
 
+        // Code:
+        // JSR $4240
+        // LDA #$FF
         let prog: Vec<u8> = [0x20, 0x40, 0x42].to_vec();
         c.load_program(prog);
         c.memory[0x4240] = 0xA9;
@@ -1578,14 +1814,19 @@ mod jump {
         c.execute_cycle();
         c.execute_cycle();
         assert_eq!(0xFF, c.acc);
-        assert_eq!(c.memory[0x0100], 0x03);
-        assert_eq!(c.memory[0x0101], 0x02);
+        assert_eq!(c.memory[0x0100], 0x02);
+        assert_eq!(c.memory[0x0101], 0x03);
     }
 
     #[test]
     fn return_jump() {
         let mut c = Chip::new();
 
+        // Code:
+        // JSR $4240
+        // LDA #$FF
+        // RTS
+        // LDA #$F0
         let prog: Vec<u8> = [0x20, 0x40, 0x42, 0xA9, 0xF0].to_vec();
         c.load_program(prog);
         c.memory[0x4240] = 0xA9;
@@ -1595,9 +1836,45 @@ mod jump {
         c.execute_cycle();
         c.execute_cycle();
         c.execute_cycle();
-        c.execute_cycle();
         assert_eq!(0xFF, c.acc);
         c.execute_cycle();
         assert_eq!(0xF0, c.acc);
+    }
+}
+
+
+/// ==========================
+/// INTERRUPT TESTS
+/// ==========================
+
+
+
+/// ==========================
+/// OTHER TESTS
+/// ==========================
+
+#[cfg(test)]
+mod other {
+    use crate::*;
+
+    #[test]
+    fn no_operation() {
+        let mut c = Chip::new();
+
+        // Code:
+        // NOP
+        // NOP
+        // NOP
+        // NOP
+        // NOP
+        let prog: Vec<u8> = [0xEA, 0xEA, 0xEA, 0xEA, 0xEA].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        c.execute_cycle();
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x205, c.pc);
     }
 }
