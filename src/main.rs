@@ -54,6 +54,10 @@ struct Chip {
     // RESERVED: 256 bytes 0x0100 to 0x01FF -> System Stack
     // PROGRAM DATA: 0x10000 - 0x206
     // RESERVED: last 6 bytes of memory
+    // $FFFA, $FFFB ... NMI (Non-Maskable Interrupt) vector, 16-bit (LB, HB)
+    // $FFFC, $FFFD ... RES (Reset) vector, 16-bit (LB, HB)
+    // $FFFE, $FFFF ... IRQ (Interrupt Request) vector, 16-bit (LB, HB)
+    // Last 6 bytes therefor be: [ ]
     pub memory: [u8; MEMORY],
 }
 
@@ -89,6 +93,16 @@ impl Chip {
         self.sp -= 1;
         let data = self.memory[0x0100 + self.sp as usize];
         data
+    }
+
+    fn increment(&mut self, value: u8, increment_value: u8) -> u8 {
+        let ( res, _ ) = value.overflowing_add(increment_value);
+        res
+    }
+
+    fn decrement(&mut self, value: u8, decrement_value: u8) -> u8 {
+        let ( res, _ ) = value.overflowing_sub(decrement_value);
+        res
     }
 
     fn read_byte(&mut self, address: u16) -> u8 {
@@ -147,6 +161,15 @@ impl Chip {
 
     fn bytes_to_word(&self, ll: u8, hh: u8) -> u16 {
         (ll as u16) + ((hh as u16) << 8)
+    }
+
+    fn  set_flags_zero_neg(&mut self, value: u8) {
+        if value == 0 {
+            self.f |= Z;
+        }
+        if value > 0x80 {
+            self.f |= N;
+        }
     }
 
     /// Returns the address depending on the given AddreessMode
@@ -430,9 +453,7 @@ impl Chip {
         };
         let address = self.get_address(addr);
         self.acc = self.read_byte(address);
-        if self.acc == 0 {
-            self.f = Z;
-        }
+        self. set_flags_zero_neg(self.acc);
     }
 
     // load X
@@ -442,9 +463,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.rx = self.read_byte(address);
-        if self.rx == 0 {
-            self.f = Z;
-        }
+        self. set_flags_zero_neg(self.rx);
     }
 
     // load Y
@@ -454,9 +473,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.ry = self.read_byte(address);
-        if self.ry == 0 {
-            self.f = Z;
-        }
+        self. set_flags_zero_neg(self.ry);
     }
 
     // store accumulator
@@ -577,11 +594,10 @@ impl Chip {
             println!("dec");
         }
         let address = self.get_address(addr);
-        let res = self.read_byte(address) - 1;
+        let byte = self.read_byte(address);
+        let res = self.decrement(byte, 1);
         self.write_byte(res, address);
-        if res == 0 {
-            self.f = Z;
-        }
+        self. set_flags_zero_neg(res);
     }
 
     // decrement X
@@ -589,10 +605,8 @@ impl Chip {
         if DEBUGLOG {
             println!("dex");
         }
-        self.rx -= 1;
-        if self.rx == 0 {
-            self.f = Z;
-        }
+        self.rx = self.decrement(self.rx, 1);
+        self. set_flags_zero_neg(self.rx);
     }
 
     // decrement Y
@@ -600,10 +614,8 @@ impl Chip {
         if DEBUGLOG {
             println!("dey");
         }
-        self.ry -= 1;
-        if self.ry == 0 {
-            self.f = Z;
-        }
+        self.ry = self.decrement(self.ry, 1);
+        self. set_flags_zero_neg(self.ry);
     }
 
     // increment
@@ -612,11 +624,10 @@ impl Chip {
             println!("inc");
         }
         let address = self.get_address(addr);
-        let res = self.read_byte(address) + 1;
+        let byte = self.read_byte(address);
+        let res = self.increment(byte, 1);
         self.write_byte(res, address);
-        if res == 0 {
-            self.f = Z;
-        }
+        self. set_flags_zero_neg(res);
     }
 
     // increment X
@@ -624,10 +635,8 @@ impl Chip {
         if DEBUGLOG {
             println!("inx");
         }
-        self.rx += 1;
-        if self.rx  == 0 {
-            self.f = Z;
-        }
+        self.rx = self.increment(self.rx, 1);
+        self. set_flags_zero_neg(self.rx);
     }
 
     // increment Y
@@ -635,10 +644,8 @@ impl Chip {
         if DEBUGLOG {
             println!("iny");
         }
-        self.ry += 1;
-        if self.ry == 0 {
-            self.f = Z;
-        }
+        self.ry = self.increment(self.ry, 1);
+        self. set_flags_zero_neg(self.ry);
     }
 
     /// ======================
@@ -930,6 +937,7 @@ impl Chip {
         let hh = self.pop_stack();
         let ll = self.pop_stack();
         self.bytes_to_word(ll, hh);
+
         self.pc = self.bytes_to_word(ll, hh);
     }
 
