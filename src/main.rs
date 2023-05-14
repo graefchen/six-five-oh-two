@@ -63,7 +63,7 @@ impl Chip {
             acc: 0,
             rx: 0,
             ry: 0,
-            f: Z,
+            f: 0,
             sp: 0,
             pc: 0x0200, // 256 + 256
             memory: [0; MEMORY],
@@ -624,7 +624,7 @@ impl Chip {
         if DEBUGLOG {
             println!("inx");
         }
-        self.rx -= 1;
+        self.rx += 1;
         if self.rx  == 0 {
             self.f = Z;
         }
@@ -635,7 +635,7 @@ impl Chip {
         if DEBUGLOG {
             println!("iny");
         }
-        self.ry -= 1;
+        self.ry += 1;
         if self.ry == 0 {
             self.f = Z;
         }
@@ -993,6 +993,9 @@ fn main() {
     // }
 }
 
+/// ==========================
+/// TRANSFER INSTRUCTIONS TEST
+/// ==========================
 
 #[cfg(test)]
 mod load_accumulator {
@@ -1021,10 +1024,18 @@ mod load_accumulator {
         assert_eq!(0x12, c.acc);
     }
 
-    // #[test]
-    // fn zeropage_x_mode() {
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
 
-    // }
+        let prog: Vec<u8> = [0xB5, 0x01].to_vec();
+        c.rx = 0x01;
+        c.memory[0x02] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.acc);
+    }
     
     #[test]
     fn absolute_mode() {
@@ -1038,15 +1049,31 @@ mod load_accumulator {
         assert_eq!(0x12, c.acc);
     }
 
-    // #[test]
-    // fn absolute_x_mode() {
+    #[test]
+    fn absolute_x_mode() {
+        let mut c = Chip::new();
 
-    // }
+        let prog: Vec<u8> = [0xBD, 0xF0, 0xFF].to_vec();
+        c.rx = 0x2;
+        c.memory[0xFFF2] = 0x12;
+        c.load_program(prog);
 
-    // #[test]
-    // fn absolute_y_mode() {
+        c.execute_cycle();
+        assert_eq!(0x12, c.acc);
+    }
 
-    // }
+    #[test]
+    fn absolute_y_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xB9, 0xF0, 0xFF].to_vec();
+        c.ry = 0x5;
+        c.memory[0xFFF5] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.acc);
+    }
 
     // #[test]
     // fn indirect_x_mode() {
@@ -1066,7 +1093,7 @@ mod load_accumulator {
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(Z, c.f);
+        assert_ne!(Z, c.f);
     }
 }
 
@@ -1097,10 +1124,18 @@ mod load_x {
         assert_eq!(0x12, c.rx);
     }
 
-    // #[test]
-    // fn zeropage_y_mode() {
+    #[test]
+    fn zeropage_y_mode() {
+        let mut c = Chip::new();
 
-    // }
+        let prog: Vec<u8> = [0xB6, 0x01].to_vec();
+        c.ry = 0x4;
+        c.memory[0x05] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.rx);
+    }
 
     #[test]
     fn absolute_mode() {
@@ -1127,7 +1162,7 @@ mod load_x {
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(Z, c.f);
+        assert_ne!(Z, c.f);
     }
 }
 
@@ -1158,10 +1193,18 @@ mod load_y {
         assert_eq!(0x12, c.ry);
     }
 
-    // #[test]
-    // fn zeropage_x_mode() {
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
 
-    // }
+        let prog: Vec<u8> = [0xB4, 0x01].to_vec();
+        c.rx = 0x0A;
+        c.memory[0x0B] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(0x12, c.ry);
+    }
 
     #[test]
     fn absolute_mode() {
@@ -1188,9 +1231,268 @@ mod load_y {
         c.load_program(prog);
 
         c.execute_cycle();
+        assert_ne!(Z, c.f);
+    }
+}
+
+
+/// ==============================
+/// DECREMENNT & INCREMENNT TESTS
+/// ==============================
+
+#[cfg(test)]
+mod decrement {
+    use crate::*;
+
+    #[test]
+    fn zeropage_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xC6, 0x01].to_vec();
+        c.memory[0x01] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x01], 0x11);
+    }
+
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xD6, 0x01].to_vec();
+        c.rx = 0x01;
+        c.memory[0x02] = 0x13;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x02], 0x12);
+    }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xCE, 0xF0, 0xFF].to_vec();
+        c.memory[0xFFF0] = 0xAA;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF0], 0xA9);
+    }
+
+    #[test]
+    fn absolute_x_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xDE, 0xF0, 0xF0].to_vec();
+        c.rx = 0x03;
+        c.memory[0xF0F3] = 0xAA;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xF0F3], 0xA9);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xC6, 0x01].to_vec();
+        c.memory[0x01] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
         assert_eq!(Z, c.f);
     }
 }
+
+#[cfg(test)]
+mod decrement_x {
+    use crate::*;
+
+    #[test]
+    fn implied() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xCA].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.rx, 0x00);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xCA].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod decrement_y {
+    use crate::*;
+
+    #[test]
+    fn implied() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x88].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.rx, 0x00);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0x88].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod increment {
+    use crate::*;
+
+    #[test]
+    fn zeropage_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xE6, 0x01].to_vec();
+        c.memory[0x01] = 0x12;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x01], 0x13);
+    }
+
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xF6, 0x01].to_vec();
+        c.rx = 0x01;
+        c.memory[0x02] = 0x14;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x02], 0x15);
+    }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xEE, 0xF0, 0xFF].to_vec();
+        c.memory[0xFFF0] = 0xAA;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF0], 0xAB);
+    }
+
+    #[test]
+    fn absolute_x_mode() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xFE, 0xF0, 0xF0].to_vec();
+        c.rx = 0x03;
+        c.memory[0xF0F3] = 0xAA;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xF0F3], 0xAB);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xE6, 0x01].to_vec();
+        c.memory[0x01] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_ne!(Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod increment_x {
+    use crate::*;
+
+    #[test]
+    fn implied() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xE8].to_vec();
+        c.rx = 0x11;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.rx, 0x12);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xE8].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_ne!(Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod increment_y {
+    use crate::*;
+
+    #[test]
+    fn implied() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xC8].to_vec();
+        c.ry = 0x02;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.ry, 0x03);
+    }
+
+    #[test]
+    fn flag() {
+        let mut c = Chip::new();
+
+        let prog: Vec<u8> = [0xC8].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_ne!(Z, c.f);
+    }
+}
+
+/// ==========================
+/// JUMP & SUBROUTINE TESTS
+/// ==========================
 
 #[cfg(test)]
 mod jump {
