@@ -95,16 +95,6 @@ impl Chip {
         data
     }
 
-    fn increment(&mut self, value: u8, increment_value: u8) -> u8 {
-        let ( res, _ ) = value.overflowing_add(increment_value);
-        res
-    }
-
-    fn decrement(&mut self, value: u8, decrement_value: u8) -> u8 {
-        let ( res, _ ) = value.overflowing_sub(decrement_value);
-        res
-    }
-
     fn read_byte(&mut self, address: u16) -> u8 {
         if DEBUGLOG {
             println!("read_byte");
@@ -598,7 +588,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
-        let res = self.decrement(byte, 1);
+        let ( res, _ ) = byte.overflowing_sub(1);
         self.write_byte(res, address);
         self.set_flags_zero_neg(res);
     }
@@ -608,7 +598,7 @@ impl Chip {
         if DEBUGLOG {
             println!("dex");
         }
-        self.rx = self.decrement(self.rx, 1);
+        ( self.rx, _ ) = self.rx.overflowing_sub(1);
         self.set_flags_zero_neg(self.rx);
     }
 
@@ -617,7 +607,7 @@ impl Chip {
         if DEBUGLOG {
             println!("dey");
         }
-        self.ry = self.decrement(self.ry, 1);
+        ( self.ry, _ ) = self.ry.overflowing_sub(1);
         self.set_flags_zero_neg(self.ry);
     }
 
@@ -628,7 +618,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
-        let res = self.increment(byte, 1);
+        let ( res, _ ) = byte.overflowing_add(1);
         self.write_byte(res, address);
         self.set_flags_zero_neg(res);
     }
@@ -638,7 +628,7 @@ impl Chip {
         if DEBUGLOG {
             println!("inx");
         }
-        self.rx = self.increment(self.rx, 1);
+        ( self.ry, _ ) = self.rx.overflowing_add(1);
         self.set_flags_zero_neg(self.rx);
     }
 
@@ -647,7 +637,7 @@ impl Chip {
         if DEBUGLOG {
             println!("iny");
         }
-        self.ry = self.increment(self.ry, 1);
+        ( self.ry, _ ) = self.ry.overflowing_add(1);
         self.set_flags_zero_neg(self.ry);
     }
 
@@ -683,9 +673,7 @@ impl Chip {
         let address = self.get_address(addr);
         let and = self.read_byte(address);
         self.acc &= and;
-        if self.acc == 0 {
-            self.f = Z;
-        }
+        self.set_flags_zero_neg(self.acc);
     }
 
     // exclusive or (with accumulator)
