@@ -230,7 +230,7 @@ impl Chip {
                 let ll = self.fetch_byte();
                 let x = self.rx;
                 let address = (ll + x) as u16;
-                return address;
+                return self.read_word(address);
             }
             AddressMode::IndirectY => {
                 let ll = self.fetch_byte();
@@ -1187,7 +1187,9 @@ mod load_accumulator {
         // LDA ($70,X)
         let prog: Vec<u8> = [0xA1, 0x70].to_vec();
         c.rx = 0x05;
-        c.memory[0x75] = 0xA5;
+        c.memory[0x75] = 0x32;
+        c.memory[0x76] = 0x30;
+        c.memory[0x3032] = 0xA5;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1400,6 +1402,221 @@ mod load_y {
 
         c.execute_cycle();
         assert_ne!(Z, c.f);
+    }
+}
+
+#[cfg(test)]
+mod store_accumulator {
+    use crate::*;
+
+    #[test]
+    fn zeropage() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $01
+        let prog: Vec<u8> = [0x85, 0x01].to_vec();
+        c.acc = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0x01], 0x01);
+    }
+
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $01,X
+        let prog: Vec<u8> = [0x95, 0x01].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0x02], 0x01);
+    }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $FFF0
+        let prog: Vec<u8> = [0x8D, 0xF0, 0xFF].to_vec();
+        c.acc = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF0], 0x01);
+    }
+
+    #[test]
+    fn absolute_x_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $FFF0,X
+        let prog: Vec<u8> = [0x9D, 0xF0, 0xFF].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF1], 0x01);
+    }
+
+    #[test]
+    fn absolute_y_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $FFF0,X
+        let prog: Vec<u8> = [0x99, 0xF0, 0xFF].to_vec();
+        c.acc = 0x01;
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF1], 0x01);
+    }
+
+    #[test]
+    fn indirect_x_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA ($70,X)
+        let prog: Vec<u8> = [ 0x81, 0x70].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x05;
+        c.memory[0x75] = 0x32;
+        c.memory[0x76] = 0x30;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0x3032], 0x01);
+    }
+
+    #[test]
+    fn indirect_y_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA ($70),Y
+        let prog: Vec<u8> = [0x91, 0x70].to_vec();
+        c.acc = 0x01;
+        c.ry = 0x10;
+        c.memory[0x70] = 0x43;
+        c.memory[0x71] = 0x35;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(c.memory[0x3553], 0x01);
+    }
+}
+
+#[cfg(test)]
+mod store_x {
+    use crate::*;
+
+    #[test]
+    fn zeropage() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STX $01
+        let prog: Vec<u8> = [0x86, 0x01].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x01], 0x01);
+    }
+
+    #[test]
+    fn zeropage_y_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STX $01,Y
+        let prog: Vec<u8> = [0x96, 0x01].to_vec();
+        c.rx = 0x01;
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x02], 0x01);
+    }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STX $FFF0
+        let prog: Vec<u8> = [0x8E, 0xF0, 0xFF].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF0], 0x01);
+    }
+}
+
+#[cfg(test)]
+mod store_y {
+    use crate::*;
+
+    #[test]
+    fn zeropage() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $01
+        let prog: Vec<u8> = [0x84, 0x01].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x01], 0x01);
+    }
+
+    #[test]
+    fn zeropage_x_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $01,X
+        let prog: Vec<u8> = [0x94, 0x01].to_vec();
+        c.rx = 0x01;
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x02], 0x01);
+    }
+
+    #[test]
+    fn absolute_mode() {
+        let mut c = Chip::new();
+
+        // Code:
+        // STA $FFF0
+        let prog: Vec<u8> = [0x8C, 0xF0, 0xFF].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0xFFF0], 0x01);
     }
 }
 
@@ -1737,7 +1954,8 @@ mod branch {
         // Code:
         // BNE $01
         // LDA $01
-        let prog: Vec<u8> = [0xD0, 0x01, 0xA9, 0x01].to_vec();
+        let prog: Vec<u8> = [0xD0, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
         c.load_program(prog);
         c.f = N;
 
