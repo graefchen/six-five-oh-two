@@ -1094,7 +1094,7 @@ mod load_accumulator {
     use crate::*;
 
     #[test]
-    fn immediate_mode() {
+    fn immediate_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1107,7 +1107,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn zeropage_mode() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1121,7 +1121,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1136,7 +1136,7 @@ mod load_accumulator {
     }
     
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1150,7 +1150,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn absolute_x_mode() {
+    fn absolute_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1165,7 +1165,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn absolute_y_mode() {
+    fn absolute_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1180,7 +1180,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn indirect_x_mode() {
+    fn indirect_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1197,7 +1197,7 @@ mod load_accumulator {
     }
 
     #[test]
-    fn indirect_y_mode() {
+    fn indirect_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1232,7 +1232,7 @@ mod load_x {
     use crate::*;
 
     #[test]
-    fn immediate_mode() {
+    fn immediate_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1245,7 +1245,7 @@ mod load_x {
     }
 
     #[test]
-    fn zeropage_mode() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1259,7 +1259,7 @@ mod load_x {
     }
 
     #[test]
-    fn zeropage_y_mode() {
+    fn zeropage_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1274,7 +1274,7 @@ mod load_x {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1288,7 +1288,7 @@ mod load_x {
     }
 
     #[test]
-    fn absolute_y_mode() {
+    fn absolute_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1321,7 +1321,7 @@ mod load_y {
     use crate::*;
 
     #[test]
-    fn immediate_mode() {
+    fn immediate_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1334,7 +1334,7 @@ mod load_y {
     }
 
     #[test]
-    fn zeropage_mode() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1348,7 +1348,7 @@ mod load_y {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1363,7 +1363,7 @@ mod load_y {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1377,7 +1377,7 @@ mod load_y {
     }
 
     #[test]
-    fn absolute_x_mode() {
+    fn absolute_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1410,7 +1410,7 @@ mod store_accumulator {
     use crate::*;
 
     #[test]
-    fn zeropage() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1425,7 +1425,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1441,7 +1441,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1456,7 +1456,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn absolute_x_mode() {
+    fn absolute_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1472,7 +1472,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn absolute_y_mode() {
+    fn absolute_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1488,7 +1488,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn indirect_x_mode() {
+    fn indirect_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1506,7 +1506,7 @@ mod store_accumulator {
     }
 
     #[test]
-    fn indirect_y_mode() {
+    fn indirect_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1529,7 +1529,7 @@ mod store_x {
     use crate::*;
 
     #[test]
-    fn zeropage() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1543,7 +1543,7 @@ mod store_x {
     }
 
     #[test]
-    fn zeropage_y_mode() {
+    fn zeropage_y_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1558,7 +1558,7 @@ mod store_x {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1577,7 +1577,7 @@ mod store_y {
     use crate::*;
 
     #[test]
-    fn zeropage() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1591,7 +1591,7 @@ mod store_y {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1606,7 +1606,7 @@ mod store_y {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1619,6 +1619,121 @@ mod store_y {
         assert_eq!(c.memory[0xFFF0], 0x01);
     }
 }
+
+#[cfg(test)]
+mod transfer_accumulator_to_x {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TAX
+        let prog: Vec<u8> = [0xAA].to_vec();
+        c.acc = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.rx, 0x01);
+    }
+}
+
+#[cfg(test)]
+mod transfer_accumulator_to_y {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TAY
+        let prog: Vec<u8> = [0xA8].to_vec();
+        c.acc = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.ry, 0x01);
+    }
+}
+
+#[cfg(test)]
+mod transfer_stack_pointer_to_x {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TSX
+        let prog: Vec<u8> = [0xBA].to_vec();
+        c.sp = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.rx, 0x01);
+    }
+}
+
+#[cfg(test)]
+mod transfer_x_to_accumulator {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TXA
+        let prog: Vec<u8> = [0x8A].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0x01);
+    }
+}
+
+#[cfg(test)]
+mod transfer_x_to_stack_pointer {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TXS
+        let prog: Vec<u8> = [0x9A].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.sp, 0x01);
+    }
+}
+
+#[cfg(test)]
+mod transfer_y_to_accumulator {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // TYA
+        let prog: Vec<u8> = [0x98].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0x01);
+    }
+}
+
 
 /// ==============================
 /// STACK INSTRUCTIONS TEST
@@ -1635,7 +1750,7 @@ mod decrement {
     use crate::*;
 
     #[test]
-    fn zeropage_mode() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1649,7 +1764,7 @@ mod decrement {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1664,7 +1779,7 @@ mod decrement {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1678,7 +1793,7 @@ mod decrement {
     }
 
     #[test]
-    fn absolute_x_mode() {
+    fn absolute_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1710,7 +1825,7 @@ mod decrement_x {
     use crate::*;
 
     #[test]
-    fn implied() {
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1743,7 +1858,7 @@ mod decrement_y {
     use crate::*;
 
     #[test]
-    fn implied() {
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1776,7 +1891,7 @@ mod increment {
     use crate::*;
 
     #[test]
-    fn zeropage_mode() {
+    fn zeropage_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1790,7 +1905,7 @@ mod increment {
     }
 
     #[test]
-    fn zeropage_x_mode() {
+    fn zeropage_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1805,7 +1920,7 @@ mod increment {
     }
 
     #[test]
-    fn absolute_mode() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1819,7 +1934,7 @@ mod increment {
     }
 
     #[test]
-    fn absolute_x_mode() {
+    fn absolute_x_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1853,7 +1968,7 @@ mod increment_x {
     use crate::*;
 
     #[test]
-    fn implied() {
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1886,7 +2001,7 @@ mod increment_y {
     use crate::*;
 
     #[test]
-    fn implied() {
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -1943,6 +2058,7 @@ mod increment_y {
 /// COMPARISON TESTS
 /// ==========================
 
+// TODO: UPDATE MOD TEST TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
 mod branch {
     use crate::*;
@@ -1977,6 +2093,7 @@ mod branch {
 /// JUMP & SUBROUTINE TESTS
 /// ==========================
 
+// TODO: UPDATE JUMP TESTS TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
 mod jump {
     use crate::*;
@@ -2071,6 +2188,7 @@ mod jump {
 /// OTHER TESTS
 /// ==========================
 
+// TODO: UPDATE OTHER TESTS TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
 mod other {
     use crate::*;
