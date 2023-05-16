@@ -1,6 +1,7 @@
 // TODO: MORE TESTS
 // TODO: MORE COMMENTS
 // TODO: MORE DOCUMENTATION
+// TODO: RELOOK AT THE FLAG SETTING
 
 // Imports for reading a file
 use std::fs::File;
@@ -675,7 +676,7 @@ impl Chip {
     }
 
     /// ======================
-    /// ALOGICAL OPERATIONS
+    /// LOGICAL OPERATIONS
     /// ======================
 
     // and (with accumulator)
@@ -834,6 +835,7 @@ impl Chip {
         todo!("clv");
     }
 
+    // set decimal flag
     fn sec(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("sec");
@@ -870,7 +872,7 @@ impl Chip {
         let (res, _) = self.acc.overflowing_sub(self.read_byte(address));
         self.set_zero_neg_flags(res);
         if self.acc >= res {
-            self.f = C;
+            self.f |= C;
         }
     }
 
@@ -879,7 +881,12 @@ impl Chip {
         if DEBUGLOG {
             println!("cpx");
         }
-        todo!("cpx");
+        let addresse = self.get_address(addr);
+        let (res, _ ) = self.rx.overflowing_sub(self.read_byte(addresse));
+        self.set_zero_neg_flags(res);
+        if self.rx >= res {
+            self.f |= C;
+        }
     }
 
     // compare with Y
@@ -887,7 +894,12 @@ impl Chip {
         if DEBUGLOG {
             println!("cpy");
         }
-        todo!("cpy");
+        let addresse = self.get_address(addr);
+        let (res, _ ) = self.ry.overflowing_sub(self.read_byte(addresse));
+        self.set_zero_neg_flags(res);
+        if self.ry >= res {
+            self.f |= C;
+        }
     }
 
     /// ======================
@@ -1140,9 +1152,9 @@ mod load_accumulator {
         let mut c = Chip::new();
 
         // Code:
-        // LDA $FFF0
-        let prog: Vec<u8> = [0xAD, 0xF0, 0xFF].to_vec();
-        c.memory[0xFFF0] = 0x12;
+        // LDA $3010
+        let prog: Vec<u8> = [0xAD, 0x10, 0x30].to_vec();
+        c.memory[0x3010] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1154,10 +1166,10 @@ mod load_accumulator {
         let mut c = Chip::new();
 
         // Code:
-        // LDA $FFF0,X
-        let prog: Vec<u8> = [0xBD, 0xF0, 0xFF].to_vec();
-        c.rx = 0x2;
-        c.memory[0xFFF2] = 0x12;
+        // LDA $3120,X
+        let prog: Vec<u8> = [0xBD, 0x20, 0x31].to_vec();
+        c.rx = 0x12;
+        c.memory[0x3132] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1169,10 +1181,10 @@ mod load_accumulator {
         let mut c = Chip::new();
 
         // Code:
-        // LDA $FFF0,Y
-        let prog: Vec<u8> = [0xB9, 0xF0, 0xFF].to_vec();
-        c.ry = 0x5;
-        c.memory[0xFFF5] = 0x12;
+        // LDA $3120,Y
+        let prog: Vec<u8> = [0xB9, 0x20, 0x31].to_vec();
+        c.ry = 0x12;
+        c.memory[0x3132] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1278,9 +1290,9 @@ mod load_x {
         let mut c = Chip::new();
 
         // Code:
-        // LDX $FFF0
-        let prog: Vec<u8> = [0xAE, 0xF0, 0xFF].to_vec();
-        c.memory[0xFFF0] = 0x12;
+        // LDX $3120
+        let prog: Vec<u8> = [0xAE, 0x20, 0x31].to_vec();
+        c.memory[0x3120] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1292,10 +1304,10 @@ mod load_x {
         let mut c = Chip::new();
 
         // Code:
-        // LDX %FFF0,Y
-        let prog: Vec<u8> = [0xBE, 0xF0, 0xFF].to_vec();
-        c.ry = 0x5;
-        c.memory[0xFFF5] = 0x12;
+        // LDX $3120,Y
+        let prog: Vec<u8> = [0xBE, 0x20, 0x31].to_vec();
+        c.ry = 0x12;
+        c.memory[0x3132] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1381,10 +1393,10 @@ mod load_y {
         let mut c = Chip::new();
 
         // Code:
-        // LDY $FFF0,X
-        let prog: Vec<u8> = [0xBC, 0xF0, 0xFF].to_vec();
-        c.rx = 0x2;
-        c.memory[0xFFF2] = 0x12;
+        // LDY $3120,X
+        let prog: Vec<u8> = [0xBC, 0x20, 0x31].to_vec();
+        c.rx = 0x12;
+        c.memory[0x3132] = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
@@ -1460,15 +1472,15 @@ mod store_accumulator {
         let mut c = Chip::new();
 
         // Code:
-        // STA $FFF0,X
-        let prog: Vec<u8> = [0x9D, 0xF0, 0xFF].to_vec();
+        // STA $3120,X
+        let prog: Vec<u8> = [0x9D, 0x20, 0x31].to_vec();
         c.acc = 0x01;
-        c.rx = 0x01;
+        c.rx = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
         c.execute_cycle();
-        assert_eq!(c.memory[0xFFF1], 0x01);
+        assert_eq!(c.memory[0x3132], 0x01);
     }
 
     #[test]
@@ -1476,15 +1488,15 @@ mod store_accumulator {
         let mut c = Chip::new();
 
         // Code:
-        // STA $FFF0,X
-        let prog: Vec<u8> = [0x99, 0xF0, 0xFF].to_vec();
+        // STA $3120,Y
+        let prog: Vec<u8> = [0x99, 0x20, 0x31].to_vec();
         c.acc = 0x01;
-        c.ry = 0x01;
+        c.ry = 0x12;
         c.load_program(prog);
 
         c.execute_cycle();
         c.execute_cycle();
-        assert_eq!(c.memory[0xFFF1], 0x01);
+        assert_eq!(c.memory[0x3132], 0x01);
     }
 
     #[test]
@@ -1797,14 +1809,14 @@ mod decrement {
         let mut c = Chip::new();
 
         // Code:
-        // DEC $FFF0,X
-        let prog: Vec<u8> = [0xDE, 0xF0, 0xF0].to_vec();
-        c.rx = 0x03;
-        c.memory[0xF0F3] = 0xAA;
+        // DEC $3120,X
+        let prog: Vec<u8> = [0xDE, 0x20, 0x31].to_vec();
+        c.rx = 0x12;
+        c.memory[0x3132] = 0xAA;
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(c.memory[0xF0F3], 0xA9);
+        assert_eq!(c.memory[0x3132], 0xA9);
     }
 
     #[test]
@@ -1924,13 +1936,13 @@ mod increment {
         let mut c = Chip::new();
 
         // Code:
-        // INC $FFF0
-        let prog: Vec<u8> = [0xEE, 0xF0, 0xFF].to_vec();
-        c.memory[0xFFF0] = 0xAA;
+        // INC $3010
+        let prog: Vec<u8> = [0xEE, 0x10, 0x30].to_vec();
+        c.memory[0x3010] = 0xAA;
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(c.memory[0xFFF0], 0xAB);
+        assert_eq!(c.memory[0x3010], 0xAB);
     }
 
     #[test]
@@ -1938,14 +1950,14 @@ mod increment {
         let mut c = Chip::new();
 
         // Code:
-        // INC $FFF0,X
-        let prog: Vec<u8> = [0xFE, 0xF0, 0xF0].to_vec();
-        c.rx = 0x03;
-        c.memory[0xF0F3] = 0xAA;
+        // INC $3120,X
+        let prog: Vec<u8> = [0xFE, 0x20, 0x31].to_vec();
+        c.rx = 0x12;
+        c.memory[0x3132] = 0xAA;
         c.load_program(prog);
 
         c.execute_cycle();
-        assert_eq!(c.memory[0xF0F3], 0xAB);
+        assert_eq!(c.memory[0x3132], 0xAB);
     }
 
     #[test]
@@ -2058,6 +2070,239 @@ mod increment_y {
 /// COMPARISON TESTS
 /// ==========================
 
+#[cfg(test)]
+mod compare_with_accumulator {
+    use crate::*;
+
+    #[test]
+    fn immediate_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP
+        let prog: Vec<u8> = [0xC9, 0x01].to_vec();
+        c.acc = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn zeropage_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP $80
+        let prog: Vec<u8> = [0xC5, 0x80].to_vec();
+        c.acc = 0x01;
+        c.memory[0x80] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn zeropage_x_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP $80,X
+        let prog: Vec<u8> = [0xD5, 0x80].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x02;
+        c.memory[0x82] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn absolute_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP $3010
+        let prog: Vec<u8> = [0xCD].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn absolute_x_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP $3120,X
+        let prog: Vec<u8> = [0xDD, 0x20, 0x31].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x12;
+        c.memory[0x3132] = 0x1;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn absolute_y_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP $3120,Y
+        let prog: Vec<u8> = [0xD9, 0x20, 0x31].to_vec();
+        c.acc = 0x01;
+        c.ry = 0x12;
+        c.memory[0x3132] = 0x1;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn indirect_x_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP ($70,X)
+        let prog: Vec<u8> = [0xC1, 0x70].to_vec();
+        c.acc = 0x01;
+        c.rx = 0x05;
+        c.memory[0x75] = 0x32;
+        c.memory[0x76] = 0x30;
+        c.memory[0x3032] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn indirect_y_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CMP ($70),Y
+        let prog: Vec<u8> = [0xD1, 0x70].to_vec();
+        c.acc = 0x01;
+        c.ry = 0x10;
+        c.memory[0x70] = 0x43;
+        c.memory[0x71] = 0x35;
+        c.memory[0x3553] = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+}
+
+#[cfg(test)]
+mod compare_with_x {
+    use crate::*;
+
+    #[test]
+    fn immediate_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPX #$01
+        let prog: Vec<u8> = [0xE0, 0x01].to_vec();
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn zeropage_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPX $80
+        let prog: Vec<u8> = [0xE4, 0x80].to_vec();
+        c.memory[0x80] = 0x01;
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn absolute_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPX $3010
+        let prog: Vec<u8> = [0xEC, 0x10, 0x30].to_vec();
+        c.memory[0x3010] = 0x01;
+        c.rx = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+}
+
+#[cfg(test)]
+mod compare_with_y {
+    use crate::*;
+
+    #[test]
+    fn immediate_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPY #$01
+        let prog: Vec<u8> = [0xC0, 0x01].to_vec();
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn zeropage_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPY $80
+        let prog: Vec<u8> = [0xC4, 0x80].to_vec();
+        c.memory[0x80] = 0x01;
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+
+    #[test]
+    fn absolute_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CPY $3010
+        let prog: Vec<u8> = [0xCC, 0x10, 0x30].to_vec();
+        c.memory[0x3010] = 0x01;
+        c.ry = 0x01;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C | Z);
+    }
+}
+
+/// ==========================
+/// CONDITIONAL BRANCH TESTS
+/// ==========================
+
 // TODO: UPDATE MOD TEST TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
 mod branch {
@@ -2084,12 +2329,6 @@ mod branch {
 
 
 /// ==========================
-/// CONDITIONAL BRANCH TESTS
-/// ==========================
-
-
-
-/// ==========================
 /// JUMP & SUBROUTINE TESTS
 /// ==========================
 
@@ -2103,12 +2342,12 @@ mod jump {
         let mut c = Chip::new();
 
         // Code:
-        // JMP $4240
+        // JMP $3010
         // LDA #$FF
-        let prog: Vec<u8> = [0x4C, 0x40, 0x42].to_vec();
+        let prog: Vec<u8> = [0x4C, 0x10, 0x30].to_vec();
         c.load_program(prog);
-        c.memory[0x4240] = 0xA9;
-        c.memory[0x4241] = 0xFF;
+        c.memory[0x3010] = 0xA9;
+        c.memory[0x3011] = 0xFF;
 
         c.execute_cycle();
         c.execute_cycle();
