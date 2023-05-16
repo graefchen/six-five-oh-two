@@ -2332,13 +2332,12 @@ mod branch {
 /// JUMP & SUBROUTINE TESTS
 /// ==========================
 
-// TODO: UPDATE JUMP TESTS TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
 mod jump {
     use crate::*;
 
     #[test]
-    fn to_new_location_absolute() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -2355,7 +2354,7 @@ mod jump {
     }
 
     #[test]
-    fn to_new_location_indirect() {
+    fn indirect_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -2372,9 +2371,14 @@ mod jump {
         c.execute_cycle();
         assert_eq!(0xFF, c.acc);
     }
+}
+
+#[cfg(test)]
+mod jump_soubroutine {
+    use crate::*;
 
     #[test]
-    fn to_new_location_saving_return_address() {
+    fn absolute_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -2392,8 +2396,14 @@ mod jump {
         assert_eq!(c.memory[0x0101], 0x03);
     }
 
+}
+
+#[cfg(test)]
+mod return_from_subroutine {
+    use crate::*;
+
     #[test]
-    fn return_jump() {
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
