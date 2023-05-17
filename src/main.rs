@@ -1077,7 +1077,8 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let op = byte | (N & V);
-        self.f = op & self.acc;
+        self.f |= byte | (N & V);
+        self.f |= op & self.acc;
     }
 
     // no operation
@@ -2673,13 +2674,56 @@ mod return_from_interrupt {
 /// OTHER TESTS
 /// ==========================
 
-// TODO: UPDATE OTHER TESTS TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
-mod other {
+mod bit_test {
     use crate::*;
 
     #[test]
-    fn no_operation() {
+    fn zeropage_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BIT $80
+        let prog: Vec<u8> = [0x24, 0x80].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x80], 0x0);
+    }
+
+    #[test]
+    fn absolute_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BIT $3010
+        let prog: Vec<u8> = [0x2C, 0x10, 0x30].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x3010], 0x0);
+    }
+
+    #[test]
+    fn flags() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BIT $80
+        let prog: Vec<u8> = [0x24, 0x80].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x0);
+    }
+}
+
+#[cfg(test)]
+mod no_operation {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
         let mut c = Chip::new();
 
         // Code:
