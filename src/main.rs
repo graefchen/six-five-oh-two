@@ -30,7 +30,6 @@ enum AddressMode {
     AbsoluteX,
     AbsoluteY,
     Immediate,
-    Implied,
     Indirect,
     XIndirect,
     IndirectY,
@@ -143,15 +142,6 @@ impl Chip {
         (ll as u16) + ((hh as u16) << 8)
     }
 
-    fn write_word(&mut self, word: u16, address: u16) {
-        if DEBUGLOG {
-            println!("write_word");
-        }
-        let (ll, hh) = self.word_to_bytes(word);
-        self.memory[address as usize] = ll;
-        self.memory[(address + 1) as usize] = hh;
-    }
-
     fn word_to_bytes(&self, word: u16) -> (u8, u8) {
         ( word as u8 & 0xFF , (word >> 8) as u8 )
     }
@@ -160,12 +150,34 @@ impl Chip {
         (ll as u16) + ((hh as u16) << 8)
     }
 
-    fn  set_zero_neg_flags(&mut self, value: u8) {
+    /// Sets the zero and the negative flag:
+    /// 
+    /// After most instructions that have a value result, this flag will either be set or cleared based on whether or not that value is equal to zero.
+    /// 
+    /// Therefore for the Zero set:
+    /// 
+    /// If the given value is 0, the zero flag is set.
+    /// If the given value is not 0, zhe zero flag is cleared.
+    /// 
+    /// The same aplies to the negative flag,
+    /// that is only set if the seventh byte (starting at hexadecimal: `F0` or binary: `10000000`)
+    /// and cleared if it is not above of that value.
+    fn set_zero_neg_flags(&mut self, value: u8) {
         if value == 0 {
-            self.f = Z;
+            self.f |= Z;
+        } else {
+            self.f ^= Z;
         }
         if value > 0x80 {
-            self.f = N;
+            self.f |= N;
+        } else {
+            self.f ^= N;
+        }
+    }
+
+    fn clear_flag(&mut self, flag: u8) {
+        if self.f & flag == flag {
+            self.f ^= flag;
         }
     }
 
@@ -301,7 +313,7 @@ impl Chip {
             (0x1, 0x1) => self.ora(AddressMode::IndirectY),
             (0x1, 0x5) => self.ora(AddressMode::ZeropageX),
             (0x1, 0x6) => self.asl(AddressMode::ZeropageX),
-            (0x1, 0x8) => self.clc(AddressMode::Implied),
+            (0x1, 0x8) => self.clc(),
             (0x1, 0x9) => self.ora(AddressMode::AbsoluteY),
             (0x1, 0xD) => self.ora(AddressMode::AbsoluteX),
             (0x1, 0xE) => self.asl(AddressMode::AbsoluteX),
@@ -320,7 +332,7 @@ impl Chip {
             (0x3, 0x1) => self.and(AddressMode::IndirectY),
             (0x3, 0x5) => self.and(AddressMode::ZeropageX),
             (0x3, 0x6) => self.rol(AddressMode::ZeropageX),
-            (0x3, 0x8) => self.sec(AddressMode::Implied),
+            (0x3, 0x8) => self.sec(),
             (0x3, 0x9) => self.and(AddressMode::AbsoluteY),
             (0x3, 0xD) => self.and(AddressMode::AbsoluteX),
             (0x3, 0xE) => self.rol(AddressMode::AbsoluteX),
@@ -338,7 +350,7 @@ impl Chip {
             (0x5, 0x1) => self.eor(AddressMode::IndirectY),
             (0x5, 0x5) => self.eor(AddressMode::ZeropageX),
             (0x5, 0x6) => self.lsr(AddressMode::ZeropageX),
-            (0x5, 0x8) => self.cli(AddressMode::Implied),
+            (0x5, 0x8) => self.cli(),
             (0x5, 0x9) => self.eor(AddressMode::AbsoluteY),
             (0x5, 0xD) => self.eor(AddressMode::AbsoluteX),
             (0x5, 0xE) => self.lsr(AddressMode::AbsoluteX),
@@ -356,7 +368,7 @@ impl Chip {
             (0x7, 0x1) => self.adc(AddressMode::IndirectY),
             (0x7, 0x5) => self.adc(AddressMode::ZeropageX),
             (0x7, 0x6) => self.ror(AddressMode::ZeropageX),
-            (0x7, 0x8) => self.sei(AddressMode::Implied),
+            (0x7, 0x8) => self.sei(),
             (0x7, 0x9) => self.adc(AddressMode::AbsoluteY),
             (0x7, 0xD) => self.adc(AddressMode::AbsoluteX),
             (0x7, 0xE) => self.ror(AddressMode::AbsoluteX),
@@ -395,7 +407,7 @@ impl Chip {
             (0xB, 0x4) => self.ldy(AddressMode::ZeropageX),
             (0xB, 0x5) => self.lda(AddressMode::ZeropageX),
             (0xB, 0x6) => self.ldx(AddressMode::ZeropageY),
-            (0xB, 0x8) => self.clv(AddressMode::Implied),
+            (0xB, 0x8) => self.clv(),
             (0xB, 0x9) => self.lda(AddressMode::AbsoluteY),
             (0xB, 0xA) => self.tsx(),
             (0xB, 0xC) => self.ldy(AddressMode::AbsoluteX),
@@ -416,7 +428,7 @@ impl Chip {
             (0xD, 0x1) => self.cmp(AddressMode::IndirectY),
             (0xD, 0x5) => self.cmp(AddressMode::ZeropageX),
             (0xD, 0x6) => self.dec(AddressMode::ZeropageX),
-            (0xD, 0x8) => self.cld(AddressMode::Implied),
+            (0xD, 0x8) => self.cld(),
             (0xD, 0x9) => self.cmp(AddressMode::AbsoluteY),
             (0xD, 0xD) => self.cmp(AddressMode::AbsoluteX),
             (0xD, 0xE) => self.dec(AddressMode::AbsoluteX),
@@ -434,7 +446,7 @@ impl Chip {
             (0xF, 0x0) => self.beq(),
             (0xF, 0x1) => self.sbc(AddressMode::IndirectY),
             (0xF, 0x5) => self.sbc(AddressMode::ZeropageX),
-            (0xF, 0x8) => self.sed(AddressMode::Implied),
+            (0xF, 0x8) => self.sed(),
             (0xF, 0x9) => self.sbc(AddressMode::AbsoluteY),
             (0xF, 0xD) => self.sbc(AddressMode::AbsoluteX),
             (0xF, 0x6) => self.inc(AddressMode::ZeropageX),
@@ -804,59 +816,59 @@ impl Chip {
     /// ======================
 
     // clear carry
-    fn clc(&mut self, addr: AddressMode) {
+    fn clc(&mut self) {
         if DEBUGLOG {
             println!("clc");
         }
-        todo!("clc");
+        self.clear_flag(C);
     }
 
     // clear decimal
-    fn cld(&mut self, addr: AddressMode) {
+    fn cld(&mut self) {
         if DEBUGLOG {
             println!("cld");
         }
-        todo!("cld");
+        self.clear_flag(D);
     }
 
     // clear interrupt disable
-    fn cli(&mut self, addr: AddressMode) {
+    fn cli(&mut self) {
         if DEBUGLOG {
             println!("cli");
         }
-        todo!("cli");
+        self.clear_flag(I);
     }
 
     // clear overflow
-    fn clv(&mut self, addr: AddressMode) {
+    fn clv(&mut self) {
         if DEBUGLOG {
             println!("clv");
         }
-        todo!("clv");
+        self.clear_flag(V);
     }
 
-    // set decimal flag
-    fn sec(&mut self, addr: AddressMode) {
+    // set carry
+    fn sec(&mut self) {
         if DEBUGLOG {
             println!("sec");
         }
-        todo!("sec");
+        self.f |= C;
     }
 
     // set decimal
-    fn sed(&mut self, addr: AddressMode) {
+    fn sed(&mut self) {
         if DEBUGLOG {
             println!("sed");
         }
-        todo!("sed");
+        self.f |= D;
     }
 
     // set interrupt disable
-    fn sei(&mut self, addr: AddressMode) {
+    fn sei(&mut self) {
         if DEBUGLOG {
             println!("sei");
         }
-        todo!("sei");
+        self.f |= I;
     }
 
     /// ======================
@@ -1089,6 +1101,7 @@ fn main() {
 
     c.load_exe("bin/6502_functional_test.bin".to_string())
         .unwrap();
+    c.load_program([].to_vec());
     c.startup(0x200);
 
     loop {
@@ -2120,37 +2133,132 @@ mod rotate_right {
 
 #[cfg(test)]
 mod clear_carry {
+    use crate::*;
 
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CLC
+        let prog: Vec<u8> = [0x18].to_vec();
+        c.f = C;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x0);
+    }
 }
 
 #[cfg(test)]
 mod clear_decimal {
-    
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CLD
+        let prog: Vec<u8> = [0xD8].to_vec();
+        c.f = D;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x0);
+    }
 }
 
 #[cfg(test)]
 mod clear_interrupt_disable {
-    
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CLI
+        let prog: Vec<u8> = [0x58].to_vec();
+        c.f = I;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x0);
+    }
 }
 
 #[cfg(test)]
 mod clear_overflow {
-    
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // CLV
+        let prog: Vec<u8> = [0xB8].to_vec();
+        c.f = V;
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x0);
+    }
 }
 
 #[cfg(test)]
 mod set_carry {
-    
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SEC
+        let prog: Vec<u8> = [0x38].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, C)
+    }
 }
 
 #[cfg(test)]
 mod set_decimal {
-    
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SED
+        let prog: Vec<u8> = [0xF8].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, D);
+    }
 }
 
 #[cfg(test)]
-mod set_interrupt_diable {
-    
+mod set_interrupt_disable {
+    use crate::*;
+
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SEI
+        let prog: Vec<u8> = [0x78].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.f, I);
+    }
 }
 
 /// ==========================
