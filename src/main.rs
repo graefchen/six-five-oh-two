@@ -166,12 +166,12 @@ impl Chip {
         if value == 0 {
             self.f |= Z;
         } else {
-            self.f ^= Z;
+            self.clear_flag(Z);
         }
         if value > 0x80 {
             self.f |= N;
         } else {
-            self.f ^= N;
+            self.clear_flag(N);
         }
     }
 
@@ -1784,7 +1784,7 @@ mod pull_processor_status_register {
 }
 
 /// ==============================
-/// DECREMENNT & INCREMENT TESTS
+/// DECREMENT & INCREMENT TESTS
 /// ==============================
 
 #[cfg(test)]
@@ -1853,6 +1853,8 @@ mod decrement {
     fn flag() {
         let mut c = Chip::new();
 
+        // Code:
+        // DEC $01
         let prog: Vec<u8> = [0xC6, 0x01].to_vec();
         c.memory[0x01] = 0x01;
         c.load_program(prog);
