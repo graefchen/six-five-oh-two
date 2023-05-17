@@ -19,3 +19,4 @@ A bad MOS 6502 emulator
 * [14] <http://6502.org/users/obelisk/6502/reference.html>
 * [15] <https://youtube.com/playlist?list=PLLwK93hM93Z13TRzPx9JqTIn33feefl37>
 * [16] <https://www.nesdev.org/obelisk-6502-guide/reference.html>
+* [17] <https://www.nesdev.org/wiki/Status_flags#Z:_Zero>
