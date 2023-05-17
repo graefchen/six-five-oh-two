@@ -1746,12 +1746,29 @@ mod transfer_y_to_accumulator {
     }
 }
 
-
 /// ==============================
 /// STACK INSTRUCTIONS TEST
 /// ==============================
 
+#[cfg(test)]
+mod push_accumulator {
 
+}
+
+#[cfg(test)]
+mod push_processor_status_register {
+    
+}
+
+#[cfg(test)]
+mod pull_accumulator {
+    
+}
+
+#[cfg(test)]
+mod pull_processor_status_register {
+    
+}
 
 /// ==============================
 /// DECREMENNT & INCREMENT TESTS
@@ -2041,30 +2058,100 @@ mod increment_y {
     }
 }
 
-
 /// ==========================
 /// ARITHMETIC OPERATION TESTS
 /// ==========================
 
+#[cfg(test)]
+mod add_with_carry {
+    
+}
 
+#[cfg(test)]
+mod subtract_with_carry {
+    
+}
 
 /// ==========================
 /// LOGICAL TESTS
 /// ==========================
 
+#[cfg(test)]
+mod and_with_accumulator {
+    
+}
+#[cfg(test)]
+mod exclusive_or_with_accumulator {
+    
+}
 
+#[cfg(test)]
+mod or_with_accumulator {
+    
+}
 
 /// ==========================
 /// SHIFT & ROTATE TESTS
 /// ==========================
 
+#[cfg(test)]
+mod arithmtic_shift_left {
 
+}
+
+#[cfg(test)]
+mod logical_shift_right {
+    
+}
+
+#[cfg(test)]
+mod rotate_left {
+    
+}
+
+#[cfg(test)]
+mod rotate_right {
+    
+}
 
 /// ==========================
 /// FLAG TESTS
 /// ==========================
 
+#[cfg(test)]
+mod clear_carry {
 
+}
+
+#[cfg(test)]
+mod clear_decimal {
+    
+}
+
+#[cfg(test)]
+mod clear_interrupt_disable {
+    
+}
+
+#[cfg(test)]
+mod clear_overflow {
+    
+}
+
+#[cfg(test)]
+mod set_carry {
+    
+}
+
+#[cfg(test)]
+mod set_decimal {
+    
+}
+
+#[cfg(test)]
+mod set_interrupt_diable {
+    
+}
 
 /// ==========================
 /// COMPARISON TESTS
@@ -2303,13 +2390,32 @@ mod compare_with_y {
 /// CONDITIONAL BRANCH TESTS
 /// ==========================
 
-// TODO: UPDATE MOD TEST TO INCLUDE ONLY ONE OPCODE INSTRUCTION
 #[cfg(test)]
-mod branch {
+mod branch_on_carry_clear {
+    
+}
+
+#[cfg(test)]
+mod branch_on_carry_set {
+    
+}
+
+#[cfg(test)]
+mod branch_on_equal {
+    
+}
+
+#[cfg(test)]
+mod branch_on_minus {
+    
+}
+
+#[cfg(test)]
+mod branch_not_equal {
     use crate::*;
 
     #[test]
-    fn not_equal_zero() {
+    fn relative_addressing() {
         let mut c = Chip::new();
 
         // Code:
@@ -2324,9 +2430,22 @@ mod branch {
         c.execute_cycle();
         assert_eq!(0x01, c.acc);
     }
-
 }
 
+#[cfg(test)]
+mod branch_on_plus {
+    
+}
+
+#[cfg(test)]
+mod branch_on_overflow_clear {
+    
+}
+
+#[cfg(test)]
+mod branch_on_overflow_carry {
+    
+}
 
 /// ==========================
 /// JUMP & SUBROUTINE TESTS
@@ -2431,7 +2550,15 @@ mod return_from_subroutine {
 /// INTERRUPT TESTS
 /// ==========================
 
+#[cfg(test)]
+mod break_software_interrupt {
 
+}
+
+#[cfg(test)]
+mod return_from_interrupt {
+
+}
 
 /// ==========================
 /// OTHER TESTS
