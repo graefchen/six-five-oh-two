@@ -924,7 +924,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bcc");
         }
-        todo!("bcc");
+        let offset = self.fetch_byte();
+        let cf = self.f & C;
+        if cf != C {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on carry set
@@ -932,7 +936,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bcs");
         }
-        todo!("bcs");
+        let offset = self.fetch_byte();
+        let cf = self.f & C;
+        if cf == C {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on equal (zero set)
@@ -940,7 +948,11 @@ impl Chip {
         if DEBUGLOG {
             println!("beq");
         }
-        todo!("beq");
+        let offset = self.fetch_byte();
+        let zf = self.f & Z;
+        if zf == Z {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on minus (negative set)
@@ -948,7 +960,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bmi");
         }
-        todo!("bmi");
+        let offset = self.fetch_byte();
+        let mf = self.f & N;
+        if mf == N {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on not equal (zero clear)
@@ -968,7 +984,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bpl");
         }
-        todo!("bpl");
+        let offset = self.fetch_byte();
+        let mf = self.f & N;
+        if mf != N {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on overflow clear
@@ -976,7 +996,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bvc");
         }
-        todo!("bvc");
+        let offset = self.fetch_byte();
+        let of = self.f & V;
+        if of != V {
+            self.pc += offset as u16;
+        }
     }
 
     // branch on overflow set
@@ -984,7 +1008,11 @@ impl Chip {
         if DEBUGLOG {
             println!("bvs");
         }
-        todo!("bvs");
+        let offset = self.fetch_byte();
+        let of = self.f & V;
+        if of == V {
+            self.pc += offset as u16;
+        }
     }
 
     /// ======================
@@ -3225,22 +3253,90 @@ mod compare_with_y {
 
 #[cfg(test)]
 mod branch_on_carry_clear {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BCC $01
+        // LDA $01
+        let prog: Vec<u8> = [0x90, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = Z;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
 mod branch_on_carry_set {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BCS $01
+        // LDA $01
+        let prog: Vec<u8> = [0xB0, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = C;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
 mod branch_on_equal {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BEQ $01
+        // LDA $01
+        let prog: Vec<u8> = [0xF0, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = Z;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
 mod branch_on_minus {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BMI $01
+        // LDA $01
+        let prog: Vec<u8> = [0x30, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = N;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
@@ -3267,17 +3363,68 @@ mod branch_not_equal {
 
 #[cfg(test)]
 mod branch_on_plus {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BEQ $01
+        // LDA $01
+        let prog: Vec<u8> = [0xF0, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = Z;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
 mod branch_on_overflow_clear {
-    
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BVC $01
+        // LDA $01
+        let prog: Vec<u8> = [0x50, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = Z;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 #[cfg(test)]
-mod branch_on_overflow_carry {
-    
+mod branch_on_overflow_set {
+    use crate::*;
+
+    #[test]
+    fn relative_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BVS $01
+        // LDA $01
+        let prog: Vec<u8> = [0x50, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        //                               ^ this value is not read
+        c.load_program(prog);
+        c.f = C;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_eq!(0x01, c.acc);
+    }
 }
 
 /// ==========================
