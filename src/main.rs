@@ -1,7 +1,5 @@
-// TODO: MORE TESTS
 // TODO: MORE COMMENTS
 // TODO: MORE DOCUMENTATION
-// TODO: RELOOK AT THE FLAG SETTING
 
 // Imports for reading a file
 use std::fs::File;
@@ -89,14 +87,14 @@ impl Chip {
             println!("push_stack");
         }
         self.memory[0x0100 + self.sp as usize] = address;
-        (self.sp, _ ) = self.sp.overflowing_add(1);
+        (self.sp, _) = self.sp.overflowing_add(1);
     }
 
     fn pop_stack(&mut self) -> u8 {
         if DEBUGLOG {
             println!("pop_stack");
         }
-        (self.sp, _ ) = self.sp.overflowing_sub(1);
+        (self.sp, _) = self.sp.overflowing_sub(1);
         let data = self.memory[0x0100 + self.sp as usize];
         data
     }
@@ -143,7 +141,7 @@ impl Chip {
     }
 
     fn word_to_bytes(&self, word: u16) -> (u8, u8) {
-        ( word as u8 & 0xFF , (word >> 8) as u8 )
+        (word as u8 & 0xFF, (word >> 8) as u8)
     }
 
     fn bytes_to_word(&self, ll: u8, hh: u8) -> u16 {
@@ -151,14 +149,14 @@ impl Chip {
     }
 
     /// Sets the zero and the negative flag:
-    /// 
+    ///
     /// After most instructions that have a value result, this flag will either be set or cleared based on whether or not that value is equal to zero.
-    /// 
+    ///
     /// Therefore for the Zero set:
-    /// 
+    ///
     /// If the given value is 0, the zero flag is set.
     /// If the given value is not 0, zhe zero flag is cleared.
-    /// 
+    ///
     /// The same aplies to the negative flag,
     /// that is only set if the seventh byte (starting at hexadecimal: `F0` or binary: `10000000`)
     /// and cleared if it is not above of that value.
@@ -182,8 +180,8 @@ impl Chip {
     }
 
     /// Returns the address depending on the given AddressMode.
-    /// 
-    /// 
+    ///
+    ///
     /// TODO: Refactor this into an own function that I do not need to use
     ///       this weird algorithm in getting first the address and then
     ///       reading from the address like:
@@ -199,7 +197,7 @@ impl Chip {
             AddressMode::Immediate => {
                 // Need to increment the pc
                 // Else it would not register that we have
-                // "read" the 
+                // "read" the
                 self.pc += 1;
                 return self.pc - 1;
             }
@@ -252,7 +250,9 @@ impl Chip {
                 let address2 = self.read_word(address) + y as u16;
                 return address2;
             }
-            _ => { return 0; }
+            _ => {
+                return 0;
+            }
         }
     }
 
@@ -613,7 +613,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
-        let ( res, _ ) = byte.overflowing_sub(1);
+        let (res, _) = byte.overflowing_sub(1);
         self.write_byte(res, address);
         self.set_zero_neg_flags(res);
     }
@@ -623,7 +623,7 @@ impl Chip {
         if DEBUGLOG {
             println!("dex");
         }
-        ( self.rx, _ ) = self.rx.overflowing_sub(1);
+        (self.rx, _) = self.rx.overflowing_sub(1);
         self.set_zero_neg_flags(self.rx);
     }
 
@@ -632,7 +632,7 @@ impl Chip {
         if DEBUGLOG {
             println!("dey");
         }
-        ( self.ry, _ ) = self.ry.overflowing_sub(1);
+        (self.ry, _) = self.ry.overflowing_sub(1);
         self.set_zero_neg_flags(self.ry);
     }
 
@@ -643,7 +643,7 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
-        let ( res, _ ) = byte.overflowing_add(1);
+        let (res, _) = byte.overflowing_add(1);
         self.write_byte(res, address);
         self.set_zero_neg_flags(res);
     }
@@ -653,7 +653,7 @@ impl Chip {
         if DEBUGLOG {
             println!("inx");
         }
-        ( self.rx, _ ) = self.rx.overflowing_add(1);
+        (self.rx, _) = self.rx.overflowing_add(1);
         self.set_zero_neg_flags(self.rx);
     }
 
@@ -662,7 +662,7 @@ impl Chip {
         if DEBUGLOG {
             println!("iny");
         }
-        ( self.ry, _ ) = self.ry.overflowing_add(1);
+        (self.ry, _) = self.ry.overflowing_add(1);
         self.set_zero_neg_flags(self.ry);
     }
 
@@ -895,7 +895,7 @@ impl Chip {
             println!("cpx");
         }
         let addresse = self.get_address(addr);
-        let (res, _ ) = self.rx.overflowing_sub(self.read_byte(addresse));
+        let (res, _) = self.rx.overflowing_sub(self.read_byte(addresse));
         self.set_zero_neg_flags(res);
         if self.rx >= res {
             self.f |= C;
@@ -908,7 +908,7 @@ impl Chip {
             println!("cpy");
         }
         let addresse = self.get_address(addr);
-        let (res, _ ) = self.ry.overflowing_sub(self.read_byte(addresse));
+        let (res, _) = self.ry.overflowing_sub(self.read_byte(addresse));
         self.set_zero_neg_flags(res);
         if self.ry >= res {
             self.f |= C;
@@ -1138,7 +1138,6 @@ fn main() {
     }
 }
 
-
 /// ==========================
 /// TRANSFER INSTRUCTIONS TEST
 /// ==========================
@@ -1188,7 +1187,7 @@ mod load_accumulator {
         c.execute_cycle();
         assert_eq!(0x12, c.acc);
     }
-    
+
     #[test]
     fn absolute_addressing() {
         let mut c = Chip::new();
@@ -1542,7 +1541,7 @@ mod store_accumulator {
 
         // Code:
         // STA ($70,X)
-        let prog: Vec<u8> = [ 0x81, 0x70].to_vec();
+        let prog: Vec<u8> = [0x81, 0x70].to_vec();
         c.acc = 0x01;
         c.rx = 0x05;
         c.memory[0x75] = 0x32;
@@ -2155,15 +2154,13 @@ mod increment_y {
 /// ARITHMETIC OPERATION TESTS
 /// ==========================
 
-#[cfg(test)]
-mod add_with_carry {
-    
-}
+// TODO: Making these tests...
 
 #[cfg(test)]
-mod subtract_with_carry {
-    
-}
+mod add_with_carry {}
+
+#[cfg(test)]
+mod subtract_with_carry {}
 
 /// ==========================
 /// LOGICAL TESTS
@@ -3494,7 +3491,6 @@ mod jump_soubroutine {
         assert_eq!(c.memory[0x0100], 0x02);
         assert_eq!(c.memory[0x0101], 0x03);
     }
-
 }
 
 #[cfg(test)]
