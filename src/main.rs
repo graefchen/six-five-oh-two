@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
-const DEBUGLOG: bool = false;
+const DEBUGLOG: bool = true;
 
 const MEMORY: usize = 65536;
 
@@ -1132,6 +1132,10 @@ fn main() {
         .unwrap();
     c.load_program([].to_vec());
     c.startup(0x200);
+
+    // for i in 0..MEMORY {
+    //     println!("{:>04X}: {:>2X}", i,  c.memory[i]);
+    // }
 
     loop {
         c.execute_cycle();
@@ -3367,9 +3371,9 @@ mod branch_on_plus {
         let mut c = Chip::new();
 
         // Code:
-        // BEQ $01
+        // BPL $01
         // LDA $01
-        let prog: Vec<u8> = [0xF0, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        let prog: Vec<u8> = [0x10, 0x01, 0x00, 0xA9, 0x01].to_vec();
         //                               ^ this value is not read
         c.load_program(prog);
         c.f = Z;
@@ -3413,10 +3417,10 @@ mod branch_on_overflow_set {
         // Code:
         // BVS $01
         // LDA $01
-        let prog: Vec<u8> = [0x50, 0x01, 0x00, 0xA9, 0x01].to_vec();
+        let prog: Vec<u8> = [0x70, 0x01, 0x00, 0xA9, 0x01].to_vec();
         //                               ^ this value is not read
         c.load_program(prog);
-        c.f = C;
+        c.f = V;
 
         c.execute_cycle();
         c.execute_cycle();
