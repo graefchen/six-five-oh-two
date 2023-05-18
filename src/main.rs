@@ -89,14 +89,14 @@ impl Chip {
             println!("push_stack");
         }
         self.memory[0x0100 + self.sp as usize] = address;
-        self.sp += 1;
+        (self.sp, _ ) = self.sp.overflowing_add(1);
     }
 
     fn pop_stack(&mut self) -> u8 {
         if DEBUGLOG {
             println!("pop_stack");
         }
-        self.sp -= 1;
+        (self.sp, _ ) = self.sp.overflowing_sub(1);
         let data = self.memory[0x0100 + self.sp as usize];
         data
     }
@@ -1049,7 +1049,7 @@ impl Chip {
         let (ll, hh) = self.word_to_bytes(self.pc);
         self.push_stack(hh);
         self.push_stack(ll);
-        self.f = B;
+        self.f |= B;
         self.push_stack(self.f);
         self.pc = self.read_word(0xFFFE);
     }
@@ -1059,11 +1059,10 @@ impl Chip {
         if DEBUGLOG {
             println!("rti");
         }
+        self.f = self.pop_stack() ^ B;
         let ll = self.pop_stack();
         let hh = self.pop_stack();
-        self.pop_stack();
         self.pc = self.bytes_to_word(ll, hh);
-        self.f = self.pop_stack() ^ B;
     }
 
     /// ======================
@@ -3097,12 +3096,43 @@ mod return_from_subroutine {
 
 #[cfg(test)]
 mod break_software_interrupt {
+    use crate::*;
 
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BRK
+        let prog: Vec<u8> = [0x00].to_vec();
+        c.load_program(prog);
+
+        c.execute_cycle();
+        assert_eq!(c.memory[0x100], (c.pc + 2) as u8);
+    }
 }
 
 #[cfg(test)]
 mod return_from_interrupt {
+    use crate::*;
 
+    #[test]
+    fn implied_addressing() {
+        let mut c = Chip::new();
+
+        // Code:
+        // RTI
+        let prog: Vec<u8> = [0x40].to_vec();
+        c.load_program(prog);
+        c.sp = 0x03;
+        c.memory[0x100] = 0x30;
+        c.memory[0x101] = 0x10;
+        c.memory[0x102] = B;
+
+        c.execute_cycle();
+        assert_eq!(c.f, 0x00);
+        assert_eq!(c.pc, 0x3010);
+    }
 }
 
 /// ==========================
