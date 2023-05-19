@@ -1,5 +1,6 @@
 // TODO: MORE COMMENTS
 // TODO: MORE DOCUMENTATION
+// TODO: RELOOK AT FLAGS
 
 // Imports for reading a file
 use std::fs::File;
@@ -9,13 +10,14 @@ use std::process::exit;
 
 const DEBUGLOG: bool = true;
 
+// max number of an u16
 pub const MEMORY: usize = 65536;
 
 // The flag's for the flag in the Chip
 // defined as u8 so to or them
 pub const N: u8 = 0x80; // [1000 0000] negative
 pub const V: u8 = 0x40; // [0100 0000] overflow
-                    // [0010 0000] Reserved
+                        // [0010 0000] Reserved
 pub const B: u8 = 0x10; // [0001 0000] break
 pub const D: u8 = 0x08; // [0000 1000] decimale
 pub const I: u8 = 0x04; // [0000 0100] interupt disable
@@ -84,58 +86,37 @@ impl Chip {
     /// =====================
 
     fn push_stack(&mut self, address: u8) {
-        if DEBUGLOG {
-            println!("push_stack");
-        }
         self.memory[0x0100 + self.sp as usize] = address;
         (self.sp, _) = self.sp.overflowing_add(1);
     }
 
     fn pop_stack(&mut self) -> u8 {
-        if DEBUGLOG {
-            println!("pop_stack");
-        }
         (self.sp, _) = self.sp.overflowing_sub(1);
         let data = self.memory[0x0100 + self.sp as usize];
         data
     }
 
     fn read_byte(&mut self, address: u16) -> u8 {
-        if DEBUGLOG {
-            println!("read_byte at position {:X}", address);
-        }
         self.memory[(address) as usize]
     }
 
     fn fetch_byte(&mut self) -> u8 {
-        if DEBUGLOG {
-            println!("fetch_byte at position {:X}", self.pc);
-        }
         let data = self.memory[(self.pc) as usize];
         self.pc += 1;
         data
     }
 
     fn write_byte(&mut self, byte: u8, address: u16) {
-        if DEBUGLOG {
-            println!("write_byte");
-        }
         self.memory[address as usize] = byte;
     }
 
     fn read_word(&mut self, address: u16) -> u16 {
-        if DEBUGLOG {
-            println!("read_word at position {:X} and {:X}", address, address + 1);
-        }
         let b1 = self.read_byte(address);
         let b2 = self.read_byte(address + 1);
         self.bytes_to_word(b1, b2)
     }
 
     fn fetch_word(&mut self) -> u16 {
-        if DEBUGLOG {
-            println!("fetch_word at position {:X} and {:X}", self.pc, self.pc + 1);
-        }
         let ll = self.fetch_byte();
         let hh = self.fetch_byte();
         (ll as u16) + ((hh as u16) << 8)
@@ -162,7 +143,7 @@ impl Chip {
     /// that is only set if the seventh byte (starting at hexadecimal: `F0` or binary: `10000000`)
     /// and cleared if it is not above of that value.
     fn set_zero_neg_flags(&mut self, value: u8) {
-        if value == 0 {
+        if value == 0x0 {
             self.f |= Z;
         } else {
             self.clear_flag(Z);
@@ -191,9 +172,6 @@ impl Chip {
     /// let byte = read_byte(address);
     /// ````
     fn get_address(&mut self, addr: AddressMode) -> u16 {
-        if DEBUGLOG {
-            println!("get_address with AddressMode: {:?}", addr);
-        }
         match addr {
             AddressMode::Immediate => {
                 // Need to increment the pc
@@ -285,9 +263,6 @@ impl Chip {
     }
 
     fn process_opcode(&mut self, opcode: u8) {
-        if DEBUGLOG {
-            println!("Processsing Opcode '{:X}'", opcode)
-        }
 
         if self.pc == 0xFFFA {
             exit(1);
@@ -460,7 +435,7 @@ impl Chip {
     // load accumulator
     fn lda(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("lda");
+            println!("lda: load accumulator");
         };
         let address = self.get_address(addr);
         self.acc = self.read_byte(address);
@@ -470,7 +445,7 @@ impl Chip {
     // load X
     fn ldx(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("ldx");
+            println!("ldx: load X");
         }
         let address = self.get_address(addr);
         self.rx = self.read_byte(address);
@@ -480,7 +455,7 @@ impl Chip {
     // load Y
     fn ldy(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("ldy");
+            println!("ldy: load Y");
         }
         let address = self.get_address(addr);
         self.ry = self.read_byte(address);
@@ -490,7 +465,7 @@ impl Chip {
     // store accumulator
     fn sta(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("sta");
+            println!("sta: store accumulator");
         }
         let address = self.get_address(addr);
         self.write_byte(self.acc, address);
@@ -517,7 +492,7 @@ impl Chip {
     // transfer accumulator to X
     fn tax(&mut self) {
         if DEBUGLOG {
-            println!("tax");
+            println!("tax: transfer accumulator to X");
         }
         self.rx = self.acc;
     }
@@ -541,7 +516,7 @@ impl Chip {
     // transfer X to accumulator
     fn txa(&mut self) {
         if DEBUGLOG {
-            println!("txa");
+            println!("txa: transfer X to accumulator");
         }
         self.acc = self.rx;
     }
@@ -549,7 +524,7 @@ impl Chip {
     // transfer X to stack pointer
     fn txs(&mut self) {
         if DEBUGLOG {
-            println!("txs");
+            println!("txs: transfer X to stack pointer");
         }
         self.sp = self.rx;
     }
@@ -557,7 +532,7 @@ impl Chip {
     // transfer Y to accumulator
     fn tya(&mut self) {
         if DEBUGLOG {
-            println!("tya");
+            println!("tya: transfer Y to accumulator");
         }
         self.acc = self.ry;
     }
@@ -619,7 +594,7 @@ impl Chip {
     // decrement X
     fn dex(&mut self) {
         if DEBUGLOG {
-            println!("dex");
+            println!("dex: decrement X");
         }
         (self.rx, _) = self.rx.overflowing_sub(1);
         self.set_zero_neg_flags(self.rx);
@@ -628,7 +603,7 @@ impl Chip {
     // decrement Y
     fn dey(&mut self) {
         if DEBUGLOG {
-            println!("dey");
+            println!("dey: decrement Y");
         }
         (self.ry, _) = self.ry.overflowing_sub(1);
         self.set_zero_neg_flags(self.ry);
@@ -672,7 +647,7 @@ impl Chip {
     // TODO: Some of the hardest functions
     fn adc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("adc");
+            println!("adc: add with carry");
         }
         todo!("adc");
     }
@@ -681,7 +656,7 @@ impl Chip {
     // TODO: Some of the hardest functions
     fn sbc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("sbc");
+            println!("sbc: subtract with carry");
         }
         todo!("sbc");
     }
@@ -705,7 +680,7 @@ impl Chip {
     // exclusive or (with accumulator)
     fn eor(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("eor")
+            println!("eor: exclusive or (with accumulator)")
         }
         let address = self.get_address(addr);
         let eor = self.read_byte(address);
@@ -717,7 +692,7 @@ impl Chip {
     // or with accumulator
     fn ora(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("ora");
+            println!("ora: or with accumulator");
         }
         let address = self.get_address(addr);
         let ora = self.read_byte(address);
@@ -817,7 +792,7 @@ impl Chip {
     // clear carry
     fn clc(&mut self) {
         if DEBUGLOG {
-            println!("clc");
+            println!("clc: clear carry");
         }
         self.clear_flag(C);
     }
@@ -825,7 +800,7 @@ impl Chip {
     // clear decimal
     fn cld(&mut self) {
         if DEBUGLOG {
-            println!("cld");
+            println!("cld: clear decimal");
         }
         self.clear_flag(D);
     }
@@ -877,7 +852,7 @@ impl Chip {
     // compare (with accumulator)
     fn cmp(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("cmp");
+            println!("cmp: compare (with accumulator)");
         }
         let address = self.get_address(addr);
         let (res, _) = self.acc.overflowing_sub(self.read_byte(address));
@@ -944,11 +919,10 @@ impl Chip {
     // branch on equal (zero set)
     fn beq(&mut self) {
         if DEBUGLOG {
-            println!("beq");
+            println!("beq: branch on equal (zero set)");
         }
         let offset = self.fetch_byte();
-        let zf = self.f & Z;
-        if zf == Z {
+        if self.f & Z == Z {
             self.pc += offset as u16;
         }
     }
@@ -968,7 +942,7 @@ impl Chip {
     // branch on not equal (zero clear)
     fn bne(&mut self) {
         if DEBUGLOG {
-            println!("bne");
+            println!("bne: branch on not equal (zero clear)");
         }
         let offset = self.fetch_byte();
         let zf = self.f & Z;
@@ -980,7 +954,7 @@ impl Chip {
     // branch on plus (negative clear)
     fn bpl(&mut self) {
         if DEBUGLOG {
-            println!("bpl");
+            println!("bpl: branch on plus (negative clear)");
         }
         let offset = self.fetch_byte();
         let mf = self.f & N;
@@ -1023,6 +997,9 @@ impl Chip {
             println!("jmp");
         }
         self.pc = self.get_address(addr);
+        if DEBUGLOG {
+            println!("jmp => {:>04X}" , self.pc);
+        }
     }
 
     // jump subroutine
@@ -1110,7 +1087,7 @@ impl Chip {
     // no operation
     fn nop(&mut self) {
         if DEBUGLOG {
-            println!("nop");
+            println!("nop: no operation");
         }
         // A simple empty field
         // because what says truly more than

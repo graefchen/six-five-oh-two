@@ -68,6 +68,25 @@ mod branch_on_equal {
         c.execute_cycle();
         assert_eq!(0x01, c.acc);
     }
+
+    #[test]
+    fn not_zero() {
+        let mut c = Chip::new();
+
+        // Code:
+        // BEQ $01
+        // LDA $20
+        // LDA $01
+        let prog: Vec<u8> = [0xF0, 0x01, 0xA9, 0x20, 0xA9, 0x01].to_vec();
+        c.load_program(prog);
+        c.f = N;
+
+        c.execute_cycle();
+        c.execute_cycle();
+        assert_ne!(0x01, c.acc);
+        assert_eq!(0x20, c.acc);
+        assert_eq!(0x204, c.pc);
+    }
 }
 
 #[cfg(test)]
