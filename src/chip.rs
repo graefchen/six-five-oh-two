@@ -644,7 +644,6 @@ impl Chip {
     /// ======================
 
     // add with carry
-    // TODO: Some of the hardest functions
     fn adc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("adc: add with carry");
@@ -665,13 +664,23 @@ impl Chip {
     }
 
     // subtract with carry
-    // TODO: Some of the hardest functions
     fn sbc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("sbc: subtract with carry");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
+        let carry = if self.f & C == C { 1 } else { 0 };
+        let of;
+        let origin = self.acc;
+        (self.acc, of) = self.acc.overflowing_sub(byte + carry);
+        if origin >> 7 == 0 && byte >> 7 == 1 && self.acc >> 7 == 1 {
+            self.f |= V;
+        }
+        if origin >> 7 == 1 && byte >> 7 == 0 && self.acc >> 7 == 0 {
+            self.f |= V;
+        }
+        if of == true { self.f |= C }
     }
 
     /// ======================
