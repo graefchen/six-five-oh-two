@@ -649,7 +649,19 @@ impl Chip {
         if DEBUGLOG {
             println!("adc: add with carry");
         }
-        todo!("adc");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        let carry = if self.f & C == C { 1 } else { 0 };
+        let of;
+        let origin = self.acc;
+        (self.acc, of) = self.acc.overflowing_add(byte + carry);
+        if origin >> 7 == 0 && byte >> 7 == 0 && self.acc >> 7 == 1 {
+            self.f |= V;
+        }
+        if origin >> 7 == 1 && byte >> 7 == 1 && self.acc >> 7 == 0 {
+            self.f |= V;
+        }
+        if of == true { self.f |= C }
     }
 
     // subtract with carry
@@ -658,7 +670,8 @@ impl Chip {
         if DEBUGLOG {
             println!("sbc: subtract with carry");
         }
-        todo!("sbc");
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
     }
 
     /// ======================
@@ -855,7 +868,8 @@ impl Chip {
             println!("cmp: compare (with accumulator)");
         }
         let address = self.get_address(addr);
-        let (res, _) = self.acc.overflowing_sub(self.read_byte(address));
+        let byte = self.read_byte(address);
+        let (res, _) = self.acc.overflowing_sub(byte);
         self.set_zero_neg_flags(res);
         if self.acc >= res {
             self.f |= C;
@@ -867,8 +881,9 @@ impl Chip {
         if DEBUGLOG {
             println!("cpx");
         }
-        let addresse = self.get_address(addr);
-        let (res, _) = self.rx.overflowing_sub(self.read_byte(addresse));
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        let (res, _) = self.rx.overflowing_sub(byte);
         self.set_zero_neg_flags(res);
         if self.rx >= res {
             self.f |= C;
@@ -880,8 +895,9 @@ impl Chip {
         if DEBUGLOG {
             println!("cpy");
         }
-        let addresse = self.get_address(addr);
-        let (res, _) = self.ry.overflowing_sub(self.read_byte(addresse));
+        let address = self.get_address(addr);
+        let byte = self.read_byte(address);
+        let (res, _) = self.ry.overflowing_sub(byte);
         self.set_zero_neg_flags(res);
         if self.ry >= res {
             self.f |= C;

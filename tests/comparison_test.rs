@@ -59,7 +59,9 @@ mod compare_with_accumulator {
 
         // Code:
         // CMP $3010
-        let prog: Vec<u8> = [0xCD].to_vec();
+        let prog: Vec<u8> = [0xCD, 0x10, 0x30].to_vec();
+        c.acc = 0x01;
+        c.memory[0x3010] = 0x01;
         c.load_program(prog);
 
         c.execute_cycle();
