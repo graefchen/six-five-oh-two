@@ -148,7 +148,7 @@ impl Chip {
         } else {
             self.clear_flag(Z);
         }
-        if value > 0x80 {
+        if value >= 0x80 {
             self.f |= N;
         } else {
             self.clear_flag(N);
@@ -870,10 +870,16 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.acc.overflowing_sub(byte);
-        self.set_zero_neg_flags(res);
-        if self.acc >= res {
+        if self.acc >= byte {
             self.f |= C;
         }
+        if self.acc == byte {
+            self.f |= Z;
+        }
+        if res >> 7 == 1 {
+            self.f |= N;
+        }
+        self.set_zero_neg_flags(res);
     }
 
     // compare with X
@@ -884,9 +890,14 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.rx.overflowing_sub(byte);
-        self.set_zero_neg_flags(res);
-        if self.rx >= res {
+        if self.rx >= byte {
             self.f |= C;
+        }
+        if self.rx == byte {
+            self.f |= Z;
+        }
+        if res >> 7 == 1 {
+            self.f |= N;
         }
     }
 
@@ -898,9 +909,14 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.ry.overflowing_sub(byte);
-        self.set_zero_neg_flags(res);
-        if self.ry >= res {
+        if self.ry >= byte {
             self.f |= C;
+        }
+        if self.ry == byte {
+            self.f |= Z;
+        }
+        if res >> 7 == 1 {
+            self.f |= N;
         }
     }
 
