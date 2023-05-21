@@ -72,7 +72,7 @@ impl Chip {
             ry: 0,
             f: 0,
             sp: 0,
-            pc: 0x0200, // 256 + 256
+            pc: 0xFFFC,
             memory: [0; MEMORY],
         }
     }
@@ -158,6 +158,18 @@ impl Chip {
     fn clear_flag(&mut self, flag: u8) {
         if self.f & flag == flag {
             self.f ^= flag;
+        }
+    }
+
+    fn branch(&mut self, offset: u8){
+        if offset < 0x80 {
+            self.pc += offset as u16;
+        } else {
+            if offset > 0x80 {
+                self.pc -= (offset as i8 * -1i8) as u16;
+            } else if offset == 0x80 {
+                self.pc -= 128;
+            }
         }
     }
 
@@ -249,10 +261,10 @@ impl Chip {
         // println!("buffer.len() = {}", buffer.len());
         // println!("{:?}", buffer);
         // println!("self.memory.len() = {}", self.memory.len());
-        for i in 0..buffer.len() {
+        for i in 0x0A..buffer.len() {
             // println!("i is {i}");
             // println!("{:>08b}", self.memory[i]);
-            self.memory[i] = buffer[i];
+            self.memory[i] = buffer[i - 0x0A];
         }
         Ok(())
     }
@@ -263,6 +275,10 @@ impl Chip {
     }
 
     fn process_opcode(&mut self, opcode: u8) {
+
+        if DEBUGLOG {
+            print!("{:>04x} ", self.pc - 1);
+        }
 
         if self.pc == 0xFFFA {
             exit(1);
@@ -483,7 +499,7 @@ impl Chip {
     // store Y
     fn sty(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("sty");
+            println!("sty: store Y");
         }
         let address = self.get_address(addr);
         self.write_byte(self.ry, address);
@@ -500,7 +516,7 @@ impl Chip {
     // transfer accumulator to Y
     fn tay(&mut self) {
         if DEBUGLOG {
-            println!("tay");
+            println!("tay: transfer accumulator to Y");
         }
         self.ry = self.acc;
     }
@@ -508,7 +524,7 @@ impl Chip {
     // transfer stack pointer to X
     fn tsx(&mut self) {
         if DEBUGLOG {
-            println!("tsx");
+            println!("tsx: transfer stack pointer to X");
         }
         self.rx = self.sp;
     }
@@ -544,7 +560,7 @@ impl Chip {
     // push accumulator
     fn pha(&mut self) {
         if DEBUGLOG {
-            println!("pha");
+            println!("pha: push accumulator");
         }
         self.push_stack(self.acc);
     }
@@ -552,7 +568,7 @@ impl Chip {
     // push processor status (SR)
     fn php(&mut self) {
         if DEBUGLOG {
-            println!("php");
+            println!("php: push processor status (SR)");
         }
         self.f |= B;
         self.push_stack(self.f);
@@ -561,7 +577,7 @@ impl Chip {
     // pull accumulator
     fn pla(&mut self) {
         if DEBUGLOG {
-            println!("pla");
+            println!("pla: pull accumulator");
         }
         self.acc = self.pop_stack();
         self.set_zero_neg_flags(self.acc);
@@ -570,7 +586,7 @@ impl Chip {
     // pull processor status (SR)
     fn plp(&mut self) {
         if DEBUGLOG {
-            println!("plp");
+            println!("plp: pull processor status (SR)");
         }
         self.f = self.pop_stack() ^ B;
     }
@@ -582,7 +598,7 @@ impl Chip {
     // decrement
     fn dec(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("dec");
+            println!("dec: decrement");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -612,7 +628,7 @@ impl Chip {
     // increment
     fn inc(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("inc");
+            println!("inc: increment");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -624,7 +640,7 @@ impl Chip {
     // increment X
     fn inx(&mut self) {
         if DEBUGLOG {
-            println!("inx");
+            println!("inx: increment X");
         }
         (self.rx, _) = self.rx.overflowing_add(1);
         self.set_zero_neg_flags(self.rx);
@@ -633,7 +649,7 @@ impl Chip {
     // increment Y
     fn iny(&mut self) {
         if DEBUGLOG {
-            println!("iny");
+            println!("iny: increment Y");
         }
         (self.ry, _) = self.ry.overflowing_add(1);
         self.set_zero_neg_flags(self.ry);
@@ -690,7 +706,7 @@ impl Chip {
     // and (with accumulator)
     fn and(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("and")
+            println!("and: and (with accumulator)")
         }
         let address = self.get_address(addr);
         let and = self.read_byte(address);
@@ -730,7 +746,7 @@ impl Chip {
     // arithmetic shift left
     fn asl(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("asl");
+            println!("asl: arithmetic shift left");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -750,7 +766,7 @@ impl Chip {
     // logical shift right
     fn lsr(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("lsr");
+            println!("lsr: logical shift right");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -770,7 +786,7 @@ impl Chip {
     // rotate left
     fn rol(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("rol");
+            println!("rol: rotate left");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -790,7 +806,7 @@ impl Chip {
     // rotate right
     fn ror(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("ror");
+            println!("ror: rotate right");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
@@ -830,7 +846,7 @@ impl Chip {
     // clear interrupt disable
     fn cli(&mut self) {
         if DEBUGLOG {
-            println!("cli");
+            println!("cli: clear interrupt disable");
         }
         self.clear_flag(I);
     }
@@ -838,7 +854,7 @@ impl Chip {
     // clear overflow
     fn clv(&mut self) {
         if DEBUGLOG {
-            println!("clv");
+            println!("clv: clear overflow");
         }
         self.clear_flag(V);
     }
@@ -846,7 +862,7 @@ impl Chip {
     // set carry
     fn sec(&mut self) {
         if DEBUGLOG {
-            println!("sec");
+            println!("sec: set carry");
         }
         self.f |= C;
     }
@@ -854,7 +870,7 @@ impl Chip {
     // set decimal
     fn sed(&mut self) {
         if DEBUGLOG {
-            println!("sed");
+            println!("sed: set decimal");
         }
         self.f |= D;
     }
@@ -862,7 +878,7 @@ impl Chip {
     // set interrupt disable
     fn sei(&mut self) {
         if DEBUGLOG {
-            println!("sei");
+            println!("sei: set interrupt disable");
         }
         self.f |= I;
     }
@@ -872,60 +888,82 @@ impl Chip {
     /// ======================
 
     // compare (with accumulator)
+    // FIXME: SOME BUG IN 'ERE
+    // SOLUTION: ... clear the damn values ...
     fn cmp(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("cmp: compare (with accumulator)");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
+        if DEBUGLOG {
+            println!("comparing {:>04x} to {:>02X}", self.acc, byte);
+        }
         let (res, _) = self.acc.overflowing_sub(byte);
         if self.acc >= byte {
             self.f |= C;
+        } else {
+            self.clear_flag(C);
         }
         if self.acc == byte {
             self.f |= Z;
+        } else {
+            self.clear_flag(Z);
         }
         if res >> 7 == 1 {
             self.f |= N;
+        } else {
+            self.clear_flag(N);
         }
-        self.set_zero_neg_flags(res);
     }
 
     // compare with X
     fn cpx(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("cpx");
+            println!("cpx: compare with X");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.rx.overflowing_sub(byte);
         if self.rx >= byte {
             self.f |= C;
+        } else {
+            self.clear_flag(C);
         }
         if self.rx == byte {
             self.f |= Z;
+        } else {
+            self.clear_flag(Z);
         }
         if res >> 7 == 1 {
             self.f |= N;
+        } else {
+            self.clear_flag(N);
         }
     }
 
     // compare with Y
     fn cpy(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("cpy");
+            println!("cpy: compare with Y");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.ry.overflowing_sub(byte);
         if self.ry >= byte {
             self.f |= C;
+        } else {
+            self.clear_flag(C);
         }
         if self.ry == byte {
             self.f |= Z;
+        } else {
+            self.clear_flag(Z);
         }
         if res >> 7 == 1 {
             self.f |= N;
+        } else {
+            self.clear_flag(N);
         }
     }
 
@@ -936,24 +974,24 @@ impl Chip {
     // branch on carry clear
     fn bcc(&mut self) {
         if DEBUGLOG {
-            println!("bcc");
+            println!("bcc: branch on carry clear");
         }
         let offset = self.fetch_byte();
         let cf = self.f & C;
         if cf != C {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
     // branch on carry set
     fn bcs(&mut self) {
         if DEBUGLOG {
-            println!("bcs");
+            println!("bcs: branch on carry set");
         }
         let offset = self.fetch_byte();
         let cf = self.f & C;
         if cf == C {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
@@ -964,23 +1002,24 @@ impl Chip {
         }
         let offset = self.fetch_byte();
         if self.f & Z == Z {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
     // branch on minus (negative set)
     fn bmi(&mut self) {
         if DEBUGLOG {
-            println!("bmi");
+            println!("bmi: branch on minus (negative set)");
         }
         let offset = self.fetch_byte();
         let mf = self.f & N;
         if mf == N {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
     // branch on not equal (zero clear)
+    // FIXME: SOME BUG IN 'ERE
     fn bne(&mut self) {
         if DEBUGLOG {
             println!("bne: branch on not equal (zero clear)");
@@ -988,7 +1027,7 @@ impl Chip {
         let offset = self.fetch_byte();
         let zf = self.f & Z;
         if zf != Z {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
@@ -1000,31 +1039,31 @@ impl Chip {
         let offset = self.fetch_byte();
         let mf = self.f & N;
         if mf != N {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
     // branch on overflow clear
     fn bvc(&mut self) {
         if DEBUGLOG {
-            println!("bvc");
+            println!("bvc: branch on overflow clear");
         }
         let offset = self.fetch_byte();
         let of = self.f & V;
         if of != V {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
     // branch on overflow set
     fn bvs(&mut self) {
         if DEBUGLOG {
-            println!("bvs");
+            println!("bvs: branch on overflow set");
         }
         let offset = self.fetch_byte();
         let of = self.f & V;
         if of == V {
-            self.pc += offset as u16;
+            self.branch(offset);
         }
     }
 
@@ -1035,7 +1074,7 @@ impl Chip {
     // jump
     fn jmp(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("jmp");
+            println!("jmp: jump");
         }
         self.pc = self.get_address(addr);
         if DEBUGLOG {
@@ -1046,7 +1085,7 @@ impl Chip {
     // jump subroutine
     fn jsr(&mut self) {
         if DEBUGLOG {
-            println!("jsr");
+            println!("jsr: jump subroutine");
         }
         let subaddr = self.fetch_word();
         // The write_word function is more or less the same as the
@@ -1065,7 +1104,7 @@ impl Chip {
     // return from subroutine
     fn rts(&mut self) {
         if DEBUGLOG {
-            println!("rts");
+            println!("rts: return from subroutine");
         }
         // The read_word function is more or less the same as the
         // Used pop_stack functions...
@@ -1088,7 +1127,7 @@ impl Chip {
     /// Force Break
     fn brk(&mut self) {
         if DEBUGLOG {
-            println!("brk")
+            println!("brk: break / interrupt")
         }
         let (ll, hh) = self.word_to_bytes(self.pc);
         self.push_stack(hh);
@@ -1101,7 +1140,7 @@ impl Chip {
     // return from interrupt
     fn rti(&mut self) {
         if DEBUGLOG {
-            println!("rti");
+            println!("rti: return from interrupt");
         }
         self.f = self.pop_stack() ^ B;
         let ll = self.pop_stack();
@@ -1116,7 +1155,7 @@ impl Chip {
     // bit test
     fn bit(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("bit");
+            println!("bit: bit test");
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
