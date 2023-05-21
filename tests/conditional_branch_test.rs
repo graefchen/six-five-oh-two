@@ -70,7 +70,7 @@ mod branch_on_equal {
     }
 
     #[test]
-    fn not_zero() {
+    fn flag_not_zero() {
         let mut c = Chip::new();
 
         // Code:
