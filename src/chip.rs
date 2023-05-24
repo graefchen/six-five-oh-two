@@ -87,11 +87,11 @@ impl Chip {
 
     fn push_stack(&mut self, address: u8) {
         self.memory[0x0100 + self.sp as usize] = address;
-        (self.sp, _) = self.sp.overflowing_add(1);
+        (self.sp, _) = self.sp.overflowing_sub(1);
     }
 
     fn pop_stack(&mut self) -> u8 {
-        (self.sp, _) = self.sp.overflowing_sub(1);
+        (self.sp, _) = self.sp.overflowing_add(1);
         let data = self.memory[0x0100 + self.sp as usize];
         data
     }
@@ -543,6 +543,9 @@ impl Chip {
             println!("txs: transfer X to stack pointer");
         }
         self.sp = self.rx;
+        if DEBUGLOG {
+            println!("Set x {:>02x} to stack pointer to {:>02x}", self.rx, (self.sp % 255) + 1);
+        }
     }
 
     // transfer Y to accumulator
@@ -563,6 +566,9 @@ impl Chip {
             println!("pha: push accumulator");
         }
         self.push_stack(self.acc);
+        if DEBUGLOG {
+            println!("Pushed accumulator {:>04x} to {:>02x}", self.acc, self.sp + 1);
+        }
     }
 
     // push processor status (SR)
@@ -572,6 +578,9 @@ impl Chip {
         }
         self.f |= B;
         self.push_stack(self.f);
+        if DEBUGLOG {
+            println!("Pushed processor status {} to {}", self.f, self.sp);
+        }
     }
 
     // pull accumulator
@@ -888,16 +897,18 @@ impl Chip {
     /// ======================
 
     // compare (with accumulator)
-    // FIXME: SOME BUG IN 'ERE
     // SOLUTION: ... clear the damn values ...
     fn cmp(&mut self, addr: AddressMode) {
         if DEBUGLOG {
             println!("cmp: compare (with accumulator)");
         }
         let address = self.get_address(addr);
+        if DEBUGLOG {
+            println!("comparing reading address: {:>04x}", address);
+        }
         let byte = self.read_byte(address);
         if DEBUGLOG {
-            println!("comparing {:>04x} to {:>02X}", self.acc, byte);
+            println!("comparing {:>04x} to {:>02x}", self.acc, byte);
         }
         let (res, _) = self.acc.overflowing_sub(byte);
         if self.acc >= byte {
@@ -1019,7 +1030,6 @@ impl Chip {
     }
 
     // branch on not equal (zero clear)
-    // FIXME: SOME BUG IN 'ERE
     fn bne(&mut self) {
         if DEBUGLOG {
             println!("bne: branch on not equal (zero clear)");
