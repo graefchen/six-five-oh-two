@@ -70,7 +70,7 @@ impl Chip {
             acc: 0,
             rx: 0,
             ry: 0,
-            f: 0,
+            f: 0x20,
             sp: 0,
             pc: 0xFFFC,
             memory: [0; MEMORY],
@@ -78,7 +78,7 @@ impl Chip {
     }
 
     pub fn startup(&mut self, address: u16) {
-        self.pc = self.read_word(address);
+        self.pc = address;
     }
 
     /// =====================
@@ -184,6 +184,9 @@ impl Chip {
     /// let byte = read_byte(address);
     /// ````
     fn get_address(&mut self, addr: AddressMode) -> u16 {
+        if DEBUGLOG {
+            println!("  Address Mode: {:?}", addr);
+        }
         match addr {
             AddressMode::Immediate => {
                 // Need to increment the pc
@@ -213,15 +216,15 @@ impl Chip {
             }
             AddressMode::ZeropageX => {
                 let ll = self.fetch_byte();
-                let address = ll as u16;
                 let x = self.rx;
-                return address + x as u16;
+                let (address,_) = ll.overflowing_add(x);
+                return address as u16;
             }
             AddressMode::ZeropageY => {
                 let ll = self.fetch_byte();
-                let address = ll as u16;
                 let y = self.ry;
-                return address + y as u16;
+                let (address,_)  = ll.overflowing_add(y);
+                return address as u16;
             }
             AddressMode::Indirect => {
                 let address = self.fetch_word();
@@ -231,8 +234,8 @@ impl Chip {
             AddressMode::XIndirect => {
                 let ll = self.fetch_byte();
                 let x = self.rx;
-                let address = (ll + x) as u16;
-                return self.read_word(address);
+                let (address,_) = ll.overflowing_add(x);
+                return self.read_word(address as u16);
             }
             AddressMode::IndirectY => {
                 let ll = self.fetch_byte();
@@ -261,7 +264,7 @@ impl Chip {
         // println!("buffer.len() = {}", buffer.len());
         // println!("{:?}", buffer);
         // println!("self.memory.len() = {}", self.memory.len());
-        for i in 0x0A..buffer.len() {
+        for i in 0x0A..buffer.len() + 0x0A {
             // println!("i is {i}");
             // println!("{:>08b}", self.memory[i]);
             self.memory[i] = buffer[i - 0x0A];
@@ -278,6 +281,12 @@ impl Chip {
 
         if DEBUGLOG {
             print!("{:>04x} ", self.pc - 1);
+        }
+
+        // TODO: LOOK HERE FOR THE EXIT
+        if self.pc - 1 == 0x3339 {
+            print!("");
+            // exit(0);
         }
 
         if self.pc == 0xFFFA {
@@ -456,6 +465,9 @@ impl Chip {
         let address = self.get_address(addr);
         self.acc = self.read_byte(address);
         self.set_zero_neg_flags(self.acc);
+        if DEBUGLOG {
+            println!("  Load {:>08b} to accumulator from address {:>04x}", self.acc, address);
+        }
     }
 
     // load X
@@ -466,6 +478,9 @@ impl Chip {
         let address = self.get_address(addr);
         self.rx = self.read_byte(address);
         self.set_zero_neg_flags(self.rx);
+        if DEBUGLOG {
+            println!("  Load {:>08b} to x from address {:>04x}", self.rx, address);
+        }
     }
 
     // load Y
@@ -476,6 +491,9 @@ impl Chip {
         let address = self.get_address(addr);
         self.ry = self.read_byte(address);
         self.set_zero_neg_flags(self.ry);
+        if DEBUGLOG {
+            println!("  Load {:>08b} to y from address {:>04x}", self.ry, address);
+        }
     }
 
     // store accumulator
@@ -485,15 +503,21 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.write_byte(self.acc, address);
+        if DEBUGLOG {
+            println!("  Store acc: {:>08b} to address {:>04x}", self.rx, address);
+        }
     }
 
     // store X
     fn stx(&mut self, addr: AddressMode) {
         if DEBUGLOG {
-            println!("stx");
+            println!("stx: store X");
         }
         let address = self.get_address(addr);
         self.write_byte(self.rx, address);
+        if DEBUGLOG {
+            println!("  Store x: {:>08b} to address {:>04x}", self.rx, address);
+        }
     }
 
     // store Y
@@ -503,6 +527,9 @@ impl Chip {
         }
         let address = self.get_address(addr);
         self.write_byte(self.ry, address);
+        if DEBUGLOG {
+            println!("  Store y: {:>08b} to address {:>04x}", self.rx, address);
+        }
     }
 
     // transfer accumulator to X
@@ -511,6 +538,7 @@ impl Chip {
             println!("tax: transfer accumulator to X");
         }
         self.rx = self.acc;
+        self.set_zero_neg_flags(self.rx);
     }
 
     // transfer accumulator to Y
@@ -519,6 +547,7 @@ impl Chip {
             println!("tay: transfer accumulator to Y");
         }
         self.ry = self.acc;
+        self.set_zero_neg_flags(self.ry);
     }
 
     // transfer stack pointer to X
@@ -527,6 +556,7 @@ impl Chip {
             println!("tsx: transfer stack pointer to X");
         }
         self.rx = self.sp;
+        self.set_zero_neg_flags(self.rx);
     }
 
     // transfer X to accumulator
@@ -535,6 +565,7 @@ impl Chip {
             println!("txa: transfer X to accumulator");
         }
         self.acc = self.rx;
+        self.set_zero_neg_flags(self.acc);
     }
 
     // transfer X to stack pointer
@@ -544,7 +575,7 @@ impl Chip {
         }
         self.sp = self.rx;
         if DEBUGLOG {
-            println!("Set x {:>02x} to stack pointer to {:>02x}", self.rx, (self.sp % 255) + 1);
+            println!("  Set x {:>02x} to stack pointer to {:>02x}", self.rx, (self.sp % 255) + 1);
         }
     }
 
@@ -554,6 +585,7 @@ impl Chip {
             println!("tya: transfer Y to accumulator");
         }
         self.acc = self.ry;
+        self.set_zero_neg_flags(self.acc);
     }
 
     /// ======================
@@ -565,10 +597,10 @@ impl Chip {
         if DEBUGLOG {
             println!("pha: push accumulator");
         }
-        self.push_stack(self.acc);
         if DEBUGLOG {
-            println!("Pushed accumulator {:>04x} to {:>02x}", self.acc, self.sp + 1);
+            println!("  Pushed accumulator {:>08b} to 01{:>02x}", self.acc, self.sp);
         }
+        self.push_stack(self.acc);
     }
 
     // push processor status (SR)
@@ -576,11 +608,14 @@ impl Chip {
         if DEBUGLOG {
             println!("php: push processor status (SR)");
         }
-        self.f |= B;
-        self.push_stack(self.f);
+        // self.f |= B | 0x20;
         if DEBUGLOG {
-            println!("Pushed processor status {} to {}", self.f, self.sp);
+            println!("  Pushed processor status {:>08b} to 01{:>02x}", self.f, self.sp);
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
         }
+        // Reference: https://www.nesdev.org/wiki/Status_flags#The_B_flag
+        self.push_stack(self.f | B | 0x20);
     }
 
     // pull accumulator
@@ -590,6 +625,9 @@ impl Chip {
         }
         self.acc = self.pop_stack();
         self.set_zero_neg_flags(self.acc);
+        if DEBUGLOG {
+            println!("  Pulled accumulator {:>04x} from 01{:>02x}", self.acc, self.sp);
+        }
     }
 
     // pull processor status (SR)
@@ -597,7 +635,10 @@ impl Chip {
         if DEBUGLOG {
             println!("plp: pull processor status (SR)");
         }
-        self.f = self.pop_stack() ^ B;
+        self.f = self.pop_stack();
+        if DEBUGLOG {
+            println!("  Pulled processor status {:>08b} from 01{:>02x}", self.f, self.sp);
+        }
     }
 
     /// ======================
@@ -629,9 +670,13 @@ impl Chip {
     fn dey(&mut self) {
         if DEBUGLOG {
             println!("dey: decrement Y");
+            print!("  decremented y from {:>08b}", self.ry);
         }
         (self.ry, _) = self.ry.overflowing_sub(1);
         self.set_zero_neg_flags(self.ry);
+        if DEBUGLOG {
+            println!(" to {:>08b}", self.ry);
+        }
     }
 
     // increment
@@ -676,16 +721,38 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let carry = if self.f & C == C { 1 } else { 0 };
-        let of;
-        let origin = self.acc;
+        if DEBUGLOG {
+            println!("  =>     [{:>08b}]", self.acc);
+            println!("  =>   + [{:>08b}]", byte);
+            println!("  =>   + [{:>08b}]", carry);
+        }
+        let m_7 = if self.acc & 0x80 == 0x80 { 1 } else { 0 };
+        let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
+        let (c,_) = (self.acc & 0x7F).overflowing_add(byte + carry & 0x7F);
+        let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
+        let of; 
         (self.acc, of) = self.acc.overflowing_add(byte + carry);
-        if origin >> 7 == 0 && byte >> 7 == 0 && self.acc >> 7 == 1 {
-            self.f |= V;
+        if DEBUGLOG {
+            println!("  =>   = [{:>08b}]", self.acc);
+            println!("  => m_7 = {m_7}");
+            println!("  => n_7 = {n_7}");
+            println!("  => carry bit at position 6");
+            println!("  =>     [{:>08b}]", c);
+            println!("  => c_6 = {c_6}");
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
         }
-        if origin >> 7 == 1 && byte >> 7 == 1 && self.acc >> 7 == 0 {
+        if m_7 == 0 && n_7 == 0 && c_6 == 1 || m_7 == 1 && n_7 == 1 && c_6 == 0 {
             self.f |= V;
+        } else {
+            self.clear_flag(V);
         }
-        if of == true { self.f |= C }
+        if of == true { self.f |= C } else { self.clear_flag(C) }
+        self.set_zero_neg_flags(self.acc);
+        if DEBUGLOG {
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
+        }
     }
 
     // subtract with carry
@@ -696,16 +763,37 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let carry = if self.f & C == C { 1 } else { 0 };
+        if DEBUGLOG {
+            println!("  =>     [{:>08b}]", self.acc);
+            println!("  =>   - [{:>08b}]", byte);
+            println!("  =>   - [{:>08b}]", 1 - carry);
+        }
+        let m_7 = if self.acc & 0x80 == 0x80 { 1 } else { 0 };
+        let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
+        let (c,_) = (self.acc & 0x7F).overflowing_add(((255 - byte) + carry) & 0x7F);
+        let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
+        // TODO: Description why the subtraction looks like this ...
         let of;
-        let origin = self.acc;
-        (self.acc, of) = self.acc.overflowing_sub(byte + carry);
-        if origin >> 7 == 0 && byte >> 7 == 1 && self.acc >> 7 == 1 {
-            self.f |= V;
+        (self.acc, of) = self.acc.overflowing_add((255 - byte) + carry);
+        if DEBUGLOG {
+            println!("  =>   = [{:>08b}]", self.acc);
+            println!("  => m_7 = {m_7}");
+            println!("  => n_7 = {n_7}");
+            println!("  => c_6 = {c_6}");
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
         }
-        if origin >> 7 == 1 && byte >> 7 == 0 && self.acc >> 7 == 0 {
+        if m_7 == 0 && n_7 == 1 && c_6 == 1 || m_7 == 1 && n_7 == 0 && c_6 == 0 {
             self.f |= V;
+        } else {
+            self.clear_flag(V);
         }
-        if of == true { self.f |= C }
+        if of == true { self.f |= C } else { self.clear_flag(C) }
+        self.set_zero_neg_flags(self.acc);
+        if DEBUGLOG {
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
+        }
     }
 
     /// ======================
@@ -719,7 +807,11 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let and = self.read_byte(address);
-
+        if DEBUGLOG {
+            println!("  =>     [{:>08b}]", self.acc);
+            println!("  => and [{:>08b}]", and);
+            println!("  =>   = [{:>08b}]", self.acc & and);
+        }
         self.acc &= and;
         self.set_zero_neg_flags(self.acc);
     }
@@ -731,7 +823,11 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let eor = self.read_byte(address);
-
+        if DEBUGLOG {
+            println!("  =>     [{:>08b}]", self.acc);
+            println!("  => eor [{:>08b}]", eor);
+            println!("  =>   = [{:>08b}]", self.acc ^ eor);
+        }
         self.acc ^= eor;
         self.set_zero_neg_flags(self.acc);
     }
@@ -742,9 +838,13 @@ impl Chip {
             println!("ora: or with accumulator");
         }
         let address = self.get_address(addr);
-        let ora = self.read_byte(address);
-
-        self.acc |= ora;
+        let or = self.read_byte(address);
+        if DEBUGLOG {
+            println!("  =>     [{:>08b}]", self.acc);
+            println!("  =>  or [{:>08b}]", or);
+            println!("  =>   = [{:>08b}]", self.acc | or);
+        }
+        self.acc |= or;
         self.set_zero_neg_flags(self.acc);
     }
 
@@ -761,10 +861,20 @@ impl Chip {
         let byte = self.read_byte(address);
         match addr {
             AddressMode::Accumulator => {
+                if self.acc >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
                 self.acc <<= 1;
                 self.set_zero_neg_flags(self.acc);
             }
             _ => {
+                if byte >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
                 let res = byte << 1;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
@@ -781,10 +891,20 @@ impl Chip {
         let byte = self.read_byte(address);
         match addr {
             AddressMode::Accumulator => {
+                if (self.acc << 7) >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
                 self.acc >>= 1;
                 self.set_zero_neg_flags(self.acc);
             }
             _ => {
+                if (byte << 7) >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
                 let res = byte >> 1;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
@@ -801,11 +921,31 @@ impl Chip {
         let byte = self.read_byte(address);
         match addr {
             AddressMode::Accumulator => {
-                self.acc = self.acc.rotate_left(1);
+                let oc = if self.f & C == C {
+                    0b00000001
+                } else {
+                    0b00000000
+                };
+                if self.acc >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
+                self.acc = (self.acc << 1) + oc;
                 self.set_zero_neg_flags(self.acc);
             }
             _ => {
-                let res = byte.rotate_left(1);
+                let oc = if self.f & C == C {
+                    0b00000001
+                } else {
+                    0b00000000
+                };
+                if byte >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
+                let res = (self.acc << 1) + oc;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
             }
@@ -821,11 +961,31 @@ impl Chip {
         let byte = self.read_byte(address);
         match addr {
             AddressMode::Accumulator => {
-                self.acc = self.acc.rotate_right(1);
+                let oc = if self.f & C == C {
+                    0b10000000
+                } else {
+                    0b00000000
+                };
+                if (self.acc << 7) >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
+                self.acc = (self.acc >> 1) + oc;
                 self.set_zero_neg_flags(self.acc);
             }
             _ => {
-                let res = byte.rotate_right(1);
+                let oc = if self.f & C == C {
+                    0b10000000
+                } else {
+                    0b00000000
+                };
+                if (byte << 7) >> 7 == 1 {
+                    self.f |= C;
+                } else {
+                    self.clear_flag(C);
+                }
+                let res = (self.acc >> 1) + oc;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
             }
@@ -904,11 +1064,11 @@ impl Chip {
         }
         let address = self.get_address(addr);
         if DEBUGLOG {
-            println!("comparing reading address: {:>04x}", address);
+            println!("  Comparing reading address: {:>04x}", address);
         }
         let byte = self.read_byte(address);
         if DEBUGLOG {
-            println!("comparing {:>04x} to {:>02x}", self.acc, byte);
+            println!("  Comparing memory: {:>08b} to byte: {:>08b}", self.acc, byte);
         }
         let (res, _) = self.acc.overflowing_sub(byte);
         if self.acc >= byte {
@@ -1104,7 +1264,7 @@ impl Chip {
         // Else it does exactly the same job
         // self.write_word(self.pc, self.sp as u16);
         // self.sp += 2;
-        let (ll, hh) = self.word_to_bytes(self.pc);
+        let (ll, hh) = self.word_to_bytes(self.pc - 1);
         self.push_stack(hh);
         self.push_stack(ll);
 
@@ -1137,14 +1297,20 @@ impl Chip {
     /// Force Break
     fn brk(&mut self) {
         if DEBUGLOG {
-            println!("brk: break / interrupt")
+            println!("brk: break / interrupt");
         }
-        let (ll, hh) = self.word_to_bytes(self.pc);
+        let (ll, hh) = self.word_to_bytes(self.pc + 1);
         self.push_stack(hh);
         self.push_stack(ll);
-        self.f |= B;
-        self.push_stack(self.f);
+        self.push_stack(self.f | B | 0x20);
+        if DEBUGLOG {
+            println!("  Pushed hh: {:>02x} ll: {:>02x} flags: {:>08b} on the stack", hh, ll, self.f | B | 0x20);
+        }
+        self.f |= I;
         self.pc = self.read_word(0xFFFE);
+        if DEBUGLOG {
+            println!("  Set pc to {:>04x} and flags to {:>08b}", self.read_word(0xFFFE), self.f);
+        }
     }
 
     // return from interrupt
@@ -1152,7 +1318,7 @@ impl Chip {
         if DEBUGLOG {
             println!("rti: return from interrupt");
         }
-        self.f = self.pop_stack() ^ B;
+        self.f = self.pop_stack(); // ^ (B | 0x20);
         let ll = self.pop_stack();
         let hh = self.pop_stack();
         self.pc = self.bytes_to_word(ll, hh);
@@ -1169,9 +1335,22 @@ impl Chip {
         }
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
-        let op = byte | (N & V);
-        self.f |= byte | (N & V);
-        self.f |= op & self.acc;
+        if DEBUGLOG {
+            println!("  read byte {:>08b} from address {:>04x}", byte, address);
+            println!("  bit test memory {:>08b} to A {:>08b}", byte, self.acc);
+        }
+        if (self.acc & byte) == 0x0 {
+            self.f |= Z;
+        } else {
+            self.clear_flag(Z);
+        }
+        self.f |= byte & (N | V);
+        if byte & N == 0 {
+            self.clear_flag(N);
+        }
+        if byte & V == 0 {
+            self.clear_flag(V);
+        }
     }
 
     // no operation
@@ -1185,5 +1364,102 @@ impl Chip {
         // not doing anything?
         // We could also do a wait here...
         // I will see in the future!
+    }
+}
+
+#[cfg(test)]
+mod add_with_carry {
+
+    use crate::chip::*;
+
+    #[test]
+    fn add_00000000_to_01111111_with_carry() {
+        let mut c = Chip::new();
+
+         // Code:
+        // ADC #$00
+        let prog: Vec<u8> = [0x69, 0x00].to_vec();
+        c.startup(0x0200);
+        c.load_program(prog);
+        c.acc = 0b01111111;
+        c.f = C;
+
+        c.execute_cycle();
+        // assert_eq!(c.acc, 0b10000000);
+        assert_eq!(c.f, 0b11000000);
+    }
+
+    #[test]
+    fn add_00000000_to_00111111_with_carry() {
+        let mut c = Chip::new();
+
+         // Code:
+        // ADC #$00
+        let prog: Vec<u8> = [0x69, 0x00].to_vec();
+        c.startup(0x0200);
+        c.load_program(prog);
+        c.acc = 0b00111111;
+        c.f = C;
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0b01000000);
+        assert_eq!(c.f, 0b00000000);
+    }
+}
+
+#[cfg(test)]
+mod subtract_with_carry {
+
+    use crate::chip::*;
+
+    #[test]
+    fn subtract_11111111_from_00111111_with_carry() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SBC #$FF
+        let prog: Vec<u8> = [0xE9, 0xFF].to_vec();
+        c.startup(0x0200);
+        c.load_program(prog);
+        c.acc = 0b00111111;
+        c.f = C;
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0b01000000);
+        assert_eq!(c.f, 0b00000000);
+    }
+
+    #[test]
+    fn subtract_11111111_from_01111111_with_carry() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SBC #$FF
+        let prog: Vec<u8> = [0xE9, 0xFF].to_vec();
+        c.startup(0x0200);
+        c.load_program(prog);
+        c.acc = 0b01111111;
+        c.f = C;
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0b10000000);
+        assert_eq!(c.f, 0b11000000, "Flag incorrect!");
+    }
+
+    #[test]
+    fn subtract_11111110_from_11111111_without_carry() {
+        let mut c = Chip::new();
+
+        // Code:
+        // SBC #$FF
+        let prog: Vec<u8> = [0xE9, 0b11111110].to_vec();
+        c.startup(0x0200);
+        c.load_program(prog);
+        c.acc = 0b11111111;
+        c.f = 0;
+
+        c.execute_cycle();
+        assert_eq!(c.acc, 0b00000000);
+        assert_eq!(c.f, 0b00000011, "Flag incorrect!");
     }
 }

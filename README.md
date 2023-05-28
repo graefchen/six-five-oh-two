@@ -20,3 +20,4 @@ A bad MOS 6502 emulator
 * [15] <https://youtube.com/playlist?list=PLLwK93hM93Z13TRzPx9JqTIn33feefl37>
 * [16] <https://www.nesdev.org/obelisk-6502-guide/reference.html>
 * [17] <https://www.nesdev.org/wiki/Status_flags#Z:_Zero>
+* [18] <https://www.righto.com/2012/12/the-6502-overflow-flag-explained.html>
