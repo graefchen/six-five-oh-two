@@ -14,7 +14,7 @@ mod add_with_carry {
     fn add_00000000_to_01111111_with_carry() {
         let mut c = Chip::new();
 
-         // Code:
+        // Code:
         // ADC #$00
         let prog: Vec<u8> = [0x69, 0x00].to_vec();
         c.startup(0x0200);
@@ -31,7 +31,7 @@ mod add_with_carry {
     fn add_00000000_to_00111111_with_carry() {
         let mut c = Chip::new();
 
-         // Code:
+        // Code:
         // ADC #$00
         let prog: Vec<u8> = [0x69, 0x00].to_vec();
         c.startup(0x0200);

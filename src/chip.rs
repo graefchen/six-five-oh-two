@@ -6,7 +6,6 @@
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::process::exit;
 
 // max number of an u16
 pub const MEMORY: usize = 65536;
@@ -58,7 +57,6 @@ pub struct Chip {
     // $FFFA, $FFFB ... NMI (Non-Maskable Interrupt) vector, 16-bit (LB, HB)
     // $FFFC, $FFFD ... RES (Reset) vector, 16-bit (LB, HB)
     // $FFFE, $FFFF ... IRQ (Interrupt Request) vector, 16-bit (LB, HB)
-    // Last 6 bytes therefor be: [ ]
     pub memory: [u8; MEMORY],
 }
 
@@ -70,13 +68,38 @@ impl Chip {
             ry: 0,
             f: 0,
             sp: 0xFF,
-            pc: 0xFFFC,
+            pc: 0x200,
             memory: [0; MEMORY],
         }
     }
 
+    /// ======================================
+    /// Starting and executing functions
+    /// ======================================
+
     pub fn startup(&mut self, address: u16) {
         self.pc = address;
+    }
+
+    pub fn load_program(&mut self, prog: Vec<u8>) {
+        for i in 0..prog.len() {
+            self.memory[0x200 + i] = prog[i];
+        }
+    }
+
+    pub fn load_exe(&mut self, file_path: String, zeropage_start: usize) -> io::Result<()> {
+        let mut f = File::open(file_path)?;
+        let mut buffer = Vec::new();
+
+        f.read_to_end(&mut buffer)?;
+        // println!("buffer.len() = {}", buffer.len());
+        // println!("{:?}", buffer);
+        // println!("self.memory.len() = {}", self.memory.len());
+        for i in zeropage_start..MEMORY {
+            // println!("{:>08b}", self.memory[i]);
+            self.memory[i] = buffer[i - zeropage_start];
+        }
+        Ok(())
     }
 
     /// =====================
@@ -135,22 +158,26 @@ impl Chip {
     /// Therefore for the Zero set:
     ///
     /// If the given value is 0, the zero flag is set.
-    /// If the given value is not 0, zhe zero flag is cleared.
+    /// If the given value is not 0, the zero flag is cleared.
     ///
     /// The same aplies to the negative flag,
     /// that is only set if the seventh byte (starting at hexadecimal: `F0` or binary: `10000000`)
     /// and cleared if it is not above of that value.
     fn set_zero_neg_flags(&mut self, value: u8) {
         if value == 0x0 {
-            self.f |= Z;
+            self.set_flag(Z);
         } else {
             self.clear_flag(Z);
         }
         if value >= 0x80 {
-            self.f |= N;
+            self.set_flag(N)
         } else {
             self.clear_flag(N);
         }
+    }
+
+    fn set_flag(&mut self, flag: u8) {
+        self.f |= flag;
     }
 
     fn clear_flag(&mut self, flag: u8) {
@@ -159,7 +186,7 @@ impl Chip {
         }
     }
 
-    fn branch(&mut self, offset: u8){
+    fn branch(&mut self, offset: u8) {
         if offset < 0x80 {
             self.pc += offset as u16;
         } else {
@@ -203,13 +230,13 @@ impl Chip {
             AddressMode::ZeropageX => {
                 let ll = self.fetch_byte();
                 let x = self.rx;
-                let (address,_) = ll.overflowing_add(x);
+                let (address, _) = ll.overflowing_add(x);
                 return address as u16;
             }
             AddressMode::ZeropageY => {
                 let ll = self.fetch_byte();
                 let y = self.ry;
-                let (address,_)  = ll.overflowing_add(y);
+                let (address, _) = ll.overflowing_add(y);
                 return address as u16;
             }
             AddressMode::Indirect => {
@@ -220,7 +247,7 @@ impl Chip {
             AddressMode::XIndirect => {
                 let ll = self.fetch_byte();
                 let x = self.rx;
-                let (address,_) = ll.overflowing_add(x);
+                let (address, _) = ll.overflowing_add(x);
                 return self.read_word(address as u16);
             }
             AddressMode::IndirectY => {
@@ -236,39 +263,12 @@ impl Chip {
         }
     }
 
-    pub fn load_program(&mut self, prog: Vec<u8>) {
-        for i in 0..prog.len() {
-            self.memory[0x200 + i] = prog[i];
-        }
-    }
-
-    pub fn load_exe(&mut self, file_path: String) -> io::Result<()> {
-        let mut f = File::open(file_path)?;
-        let mut buffer = Vec::new();
-
-        f.read_to_end(&mut buffer)?;
-        // println!("buffer.len() = {}", buffer.len());
-        // println!("{:?}", buffer);
-        // println!("self.memory.len() = {}", self.memory.len());
-        for i in 0x0A..buffer.len() + 0x0A {
-            // println!("i is {i}");
-            // println!("{:>08b}", self.memory[i]);
-            self.memory[i] = buffer[i - 0x0A];
-        }
-        Ok(())
-    }
-
     pub fn execute_cycle(&mut self) {
         let opcode: u8 = self.fetch_byte();
         self.process_opcode(opcode);
     }
 
     fn process_opcode(&mut self, opcode: u8) {
-
-        if self.pc == 0xFFFA {
-            exit(1);
-        }
-
         // opcodes
         let op_1 = (opcode & 0xF0) >> 4;
         let op_2 = opcode & 0x0F;
@@ -591,16 +591,20 @@ impl Chip {
         let carry = if self.f & C == C { 1 } else { 0 };
         let m_7 = if self.acc & 0x80 == 0x80 { 1 } else { 0 };
         let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
-        let (c,_) = (self.acc & 0x7F).overflowing_add(byte + carry & 0x7F);
+        let (c, _) = (self.acc & 0x7F).overflowing_add(byte + carry & 0x7F);
         let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
-        let of; 
+        let of;
         (self.acc, of) = self.acc.overflowing_add(byte + carry);
         if m_7 == 0 && n_7 == 0 && c_6 == 1 || m_7 == 1 && n_7 == 1 && c_6 == 0 {
-            self.f |= V;
+            self.set_flag(V)
         } else {
             self.clear_flag(V);
         }
-        if of == true { self.f |= C } else { self.clear_flag(C) }
+        if of == true {
+            self.set_flag(C)
+        } else {
+            self.clear_flag(C)
+        }
         self.set_zero_neg_flags(self.acc);
     }
 
@@ -611,17 +615,21 @@ impl Chip {
         let carry = if self.f & C == C { 1 } else { 0 };
         let m_7 = if self.acc & 0x80 == 0x80 { 1 } else { 0 };
         let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
-        let (c,_) = (self.acc & 0x7F).overflowing_add(((255 - byte) + carry) & 0x7F);
+        let (c, _) = (self.acc & 0x7F).overflowing_add(((255 - byte) + carry) & 0x7F);
         let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
         // TODO: Description why the subtraction looks like this ...
         let of;
         (self.acc, of) = self.acc.overflowing_add((255 - byte) + carry);
         if m_7 == 0 && n_7 == 1 && c_6 == 1 || m_7 == 1 && n_7 == 0 && c_6 == 0 {
-            self.f |= V;
+            self.set_flag(V)
         } else {
             self.clear_flag(V);
         }
-        if of == true { self.f |= C } else { self.clear_flag(C) }
+        if of == true {
+            self.set_flag(C)
+        } else {
+            self.clear_flag(C)
+        }
         self.set_zero_neg_flags(self.acc);
     }
 
@@ -664,7 +672,7 @@ impl Chip {
         match addr {
             AddressMode::Accumulator => {
                 if self.acc >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -673,7 +681,7 @@ impl Chip {
             }
             _ => {
                 if byte >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -691,7 +699,7 @@ impl Chip {
         match addr {
             AddressMode::Accumulator => {
                 if (self.acc << 7) >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -700,7 +708,7 @@ impl Chip {
             }
             _ => {
                 if (byte << 7) >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -723,7 +731,7 @@ impl Chip {
                     0b00000000
                 };
                 if self.acc >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -737,7 +745,7 @@ impl Chip {
                     0b00000000
                 };
                 if byte >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -760,7 +768,7 @@ impl Chip {
                     0b00000000
                 };
                 if (self.acc << 7) >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -774,7 +782,7 @@ impl Chip {
                     0b00000000
                 };
                 if (byte << 7) >> 7 == 1 {
-                    self.f |= C;
+                    self.set_flag(C);
                 } else {
                     self.clear_flag(C);
                 }
@@ -811,17 +819,17 @@ impl Chip {
 
     // set carry
     fn sec(&mut self) {
-        self.f |= C;
+        self.set_flag(C);
     }
 
     // set decimal
     fn sed(&mut self) {
-        self.f |= D;
+        self.set_flag(D);
     }
 
     // set interrupt disable
     fn sei(&mut self) {
-        self.f |= I;
+        self.set_flag(I);
     }
 
     /// ======================
@@ -835,12 +843,12 @@ impl Chip {
         let byte = self.read_byte(address);
         let (res, _) = self.acc.overflowing_sub(byte);
         if self.acc >= byte {
-            self.f |= C;
+            self.set_flag(C);
         } else {
             self.clear_flag(C);
         }
         if self.acc == byte {
-            self.f |= Z;
+            self.set_flag(Z);
         } else {
             self.clear_flag(Z);
         }
@@ -857,12 +865,12 @@ impl Chip {
         let byte = self.read_byte(address);
         let (res, _) = self.rx.overflowing_sub(byte);
         if self.rx >= byte {
-            self.f |= C;
+            self.set_flag(C);
         } else {
             self.clear_flag(C);
         }
         if self.rx == byte {
-            self.f |= Z;
+            self.set_flag(Z);
         } else {
             self.clear_flag(Z);
         }
@@ -879,17 +887,17 @@ impl Chip {
         let byte = self.read_byte(address);
         let (res, _) = self.ry.overflowing_sub(byte);
         if self.ry >= byte {
-            self.f |= C;
+            self.set_flag(C);
         } else {
             self.clear_flag(C);
         }
         if self.ry == byte {
-            self.f |= Z;
+            self.set_flag(Z);
         } else {
             self.clear_flag(Z);
         }
         if res >> 7 == 1 {
-            self.f |= N;
+            self.set_flag(N);
         } else {
             self.clear_flag(N);
         }
@@ -902,8 +910,7 @@ impl Chip {
     // branch on carry clear
     fn bcc(&mut self) {
         let offset = self.fetch_byte();
-        let cf = self.f & C;
-        if cf != C {
+        if self.f & C != C {
             self.branch(offset);
         }
     }
@@ -911,8 +918,7 @@ impl Chip {
     // branch on carry set
     fn bcs(&mut self) {
         let offset = self.fetch_byte();
-        let cf = self.f & C;
-        if cf == C {
+        if self.f & C == C {
             self.branch(offset);
         }
     }
@@ -928,8 +934,7 @@ impl Chip {
     // branch on minus (negative set)
     fn bmi(&mut self) {
         let offset = self.fetch_byte();
-        let mf = self.f & N;
-        if mf == N {
+        if self.f & N == N {
             self.branch(offset);
         }
     }
@@ -937,8 +942,7 @@ impl Chip {
     // branch on not equal (zero clear)
     fn bne(&mut self) {
         let offset = self.fetch_byte();
-        let zf = self.f & Z;
-        if zf != Z {
+        if self.f & Z != Z {
             self.branch(offset);
         }
     }
@@ -946,8 +950,7 @@ impl Chip {
     // branch on plus (negative clear)
     fn bpl(&mut self) {
         let offset = self.fetch_byte();
-        let mf = self.f & N;
-        if mf != N {
+        if self.f & N != N {
             self.branch(offset);
         }
     }
@@ -955,8 +958,7 @@ impl Chip {
     // branch on overflow clear
     fn bvc(&mut self) {
         let offset = self.fetch_byte();
-        let of = self.f & V;
-        if of != V {
+        if self.f & V != V {
             self.branch(offset);
         }
     }
@@ -964,8 +966,7 @@ impl Chip {
     // branch on overflow set
     fn bvs(&mut self) {
         let offset = self.fetch_byte();
-        let of = self.f & V;
-        if of == V {
+        if self.f & V == V {
             self.branch(offset);
         }
     }
@@ -1019,8 +1020,8 @@ impl Chip {
         let (ll, hh) = self.word_to_bytes(self.pc + 1);
         self.push_stack(hh);
         self.push_stack(ll);
-        self.push_stack(self.f | B | 0x20);
-        self.f |= I;
+        self.push_stack(self.f | B | R);
+        self.set_flag(I);
         self.pc = self.read_word(0xFFFE);
     }
 
@@ -1041,7 +1042,7 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         if (self.acc & byte) == 0x0 {
-            self.f |= Z;
+            self.set_flag(Z);
         } else {
             self.clear_flag(Z);
         }
