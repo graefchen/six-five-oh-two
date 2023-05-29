@@ -102,47 +102,60 @@ impl Chip {
     // Helper functions
     // =====================
 
-    fn push_stack(&mut self, address: u8) {
-        self.memory[0x0100 + self.sp as usize] = address;
+    /// pushes a byte to the stack
+    /// and then decrements the stack pointer
+    fn push_stack(&mut self, byte: u8) {
+        self.memory[0x0100 + self.sp as usize] = byte;
         (self.sp, _) = self.sp.overflowing_sub(1);
     }
 
+    /// Pops a value from the stack
+    /// and then increments the stack pointer
     fn pop_stack(&mut self) -> u8 {
         (self.sp, _) = self.sp.overflowing_add(1);
         let data = self.memory[0x0100 + self.sp as usize];
         data
     }
 
+    /// Reads a byte from the given address
     fn read_byte(&mut self, address: u16) -> u8 {
         self.memory[(address) as usize]
     }
 
+    /// Fetches a byte from the programm counter
     fn fetch_byte(&mut self) -> u8 {
         let data = self.memory[(self.pc) as usize];
         self.pc += 1;
         data
     }
 
+    /// Writes the given byte to the address
     fn write_byte(&mut self, byte: u8, address: u16) {
         self.memory[address as usize] = byte;
     }
 
+    /// Reads a word from an address
     fn read_word(&mut self, address: u16) -> u16 {
         let b1 = self.read_byte(address);
         let b2 = self.read_byte(address + 1);
         self.bytes_to_word(b1, b2)
     }
 
+    /// Fetches a word from the programm counter
     fn fetch_word(&mut self) -> u16 {
         let ll = self.fetch_byte();
         let hh = self.fetch_byte();
-        (ll as u16) + ((hh as u16) << 8)
+        self.bytes_to_word(ll, hh)
     }
 
+    /// takes a u16 (word) number and returns
+    /// two u8 (byte) numbers back
     fn word_to_bytes(&self, word: u16) -> (u8, u8) {
         (word as u8 & 0xFF, (word >> 8) as u8)
     }
 
+    /// takes two u8 (byte) numbers and returns a
+    /// u16 (word) number back
     fn bytes_to_word(&self, ll: u8, hh: u8) -> u16 {
         (ll as u16) + ((hh as u16) << 8)
     }
@@ -277,8 +290,9 @@ impl Chip {
         self.process_opcode(opcode);
     }
 
+    /// Processes an opcode and calls the correct function for the opcode
     fn process_opcode(&mut self, opcode: u8) {
-        // opcodes
+        // opcode
         let op_1 = (opcode & 0xF0) >> 4;
         let op_2 = opcode & 0x0F;
 
@@ -508,7 +522,6 @@ impl Chip {
     // transfer X to stack pointer
     fn txs(&mut self) {
         self.sp = self.rx;
-        self.set_zero_neg_flags(self.rx);
     }
 
     // transfer Y to accumulator
@@ -709,7 +722,7 @@ impl Chip {
         let byte = self.read_byte(address);
         match addr {
             AddressMode::Accumulator => {
-                if (self.acc << 7) >> 7 == 1 {
+                if self.acc & 0x01 == 1 {
                     self.set_flag(C);
                 } else {
                     self.clear_flag(C);
@@ -718,7 +731,7 @@ impl Chip {
                 self.set_zero_neg_flags(self.acc);
             }
             _ => {
-                if (byte << 7) >> 7 == 1 {
+                if self.acc & 0x01 == 1 {
                     self.set_flag(C);
                 } else {
                     self.clear_flag(C);
