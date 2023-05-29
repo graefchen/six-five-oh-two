@@ -274,10 +274,10 @@ impl Chip {
             }
             _ => {
                 // This here needs to return nothing ...
-                // because the 
-                // AddressMode::Accumulator is not handled
-                // here and can also not be handled ... because it is 
-                // kind of special
+                // because the ...
+                // AddressMode::Accumulator is not handled ...
+                // here and can also not be handled ... 
+                // because it is kind of special ...
                 return 0;
             }
         }
@@ -640,7 +640,7 @@ impl Chip {
         let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
         let (c, _) = (self.acc & 0x7F).overflowing_add(((255 - byte) & 0x7F) + carry);
         let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
-        let temp_res = (self.acc as u16) + ((255 - byte )as u16) + (carry as u16);
+        let temp_res = (self.acc as u16) + ((255 - byte) as u16) + (carry as u16);
         self.acc = (temp_res & 0xFF) as u8;
         let of = temp_res & 0x100 == 0x100;
         if m_7 == 0 && n_7 == 1 && c_6 == 1 || m_7 == 1 && n_7 == 0 && c_6 == 0 {
