@@ -1,7 +1,3 @@
-// TODO: MORE COMMENTS
-// TODO: MORE DOCUMENTATION
-// TODO: RELOOK AT FLAGS
-
 // Imports for reading a file
 use std::fs::File;
 use std::io;
@@ -73,9 +69,9 @@ impl Chip {
         }
     }
 
-    /// ======================================
-    /// Starting and executing functions
-    /// ======================================
+    // ======================================
+    // Starting and executing functions
+    // ======================================
 
     pub fn startup(&mut self, address: u16) {
         self.pc = address;
@@ -102,9 +98,9 @@ impl Chip {
         Ok(())
     }
 
-    /// =====================
-    /// Helper functions
-    /// =====================
+    // =====================
+    // Helper functions
+    // =====================
 
     fn push_stack(&mut self, address: u8) {
         self.memory[0x0100 + self.sp as usize] = address;
@@ -176,21 +172,27 @@ impl Chip {
         }
     }
 
+    /// Function to set a flag
     fn set_flag(&mut self, flag: u8) {
         self.f |= flag;
     }
 
+    /// Function to clear a flag
     fn clear_flag(&mut self, flag: u8) {
         if self.f & flag == flag {
             self.f ^= flag;
         }
     }
 
+    /// The branching function ...
+    /// Implemented here to not have repeating code ...
     fn branch(&mut self, offset: u8) {
         if offset < 0x80 {
             self.pc += offset as u16;
         } else {
             if offset > 0x80 {
+                // This code here gets the positive form a into negative
+                // parsed i8 as an u8
                 self.pc -= (offset as i8 * -1i8) as u16;
             } else if offset == 0x80 {
                 self.pc -= 128;
@@ -198,13 +200,13 @@ impl Chip {
         }
     }
 
-    /// Returns the address depending on the given AddressMode.
+    // Returns the address depending on the given AddressMode.
     fn get_address(&mut self, addr: AddressMode) -> u16 {
         match addr {
             AddressMode::Immediate => {
                 // Need to increment the pc
                 // Else it would not register that we have
-                // "read" the
+                // "read" the Immediate Address
                 self.pc += 1;
                 return self.pc - 1;
             }
@@ -258,11 +260,18 @@ impl Chip {
                 return address2;
             }
             _ => {
+                // This here needs to return nothing ...
+                // because the 
+                // AddressMode::Accumulator is not handled
+                // here and can also not be handled ... because it is 
+                // kind of special
                 return 0;
             }
         }
     }
 
+    /// This here is called execute_cycle but strictly speaking
+    /// it only executes an OPCODE
     pub fn execute_cycle(&mut self) {
         let opcode: u8 = self.fetch_byte();
         self.process_opcode(opcode);
@@ -429,9 +438,9 @@ impl Chip {
         }
     }
 
-    /// ======================
-    /// TRANSFER INSTRUCTIONS
-    /// ======================
+    // ======================
+    // TRANSFER INSTRUCTIONS
+    // ======================
 
     // load accumulator
     fn lda(&mut self, addr: AddressMode) {
@@ -508,9 +517,9 @@ impl Chip {
         self.set_zero_neg_flags(self.acc);
     }
 
-    /// ======================
-    /// STACK INSTRUCTIONS
-    /// ======================
+    // ======================
+    // STACK INSTRUCTIONS
+    // ======================
 
     // push accumulator
     fn pha(&mut self) {
@@ -534,9 +543,9 @@ impl Chip {
         self.f = self.pop_stack();
     }
 
-    /// ======================
-    /// DECREMENTS & INCREMENTS
-    /// ======================
+    // ======================
+    // DECREMENTS & INCREMENTS
+    // ======================
 
     // decrement
     fn dec(&mut self, addr: AddressMode) {
@@ -580,9 +589,9 @@ impl Chip {
         self.set_zero_neg_flags(self.ry);
     }
 
-    /// ======================
-    /// ARITHMETIC OPERATIONS
-    /// ======================
+    // ======================
+    // ARITHMETIC OPERATIONS
+    // ======================
 
     // add with carry
     fn adc(&mut self, addr: AddressMode) {
@@ -617,7 +626,9 @@ impl Chip {
         let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
         let (c, _) = (self.acc & 0x7F).overflowing_add(((255 - byte) + carry) & 0x7F);
         let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
-        // TODO: Description why the subtraction looks like this ...
+        // To suctract one number from another
+        // in binary you just flip all bits (is the same as in 8-bit (255-N))
+        // of the number and add it to the other number
         let of;
         (self.acc, of) = self.acc.overflowing_add((255 - byte) + carry);
         if m_7 == 0 && n_7 == 1 && c_6 == 1 || m_7 == 1 && n_7 == 0 && c_6 == 0 {
@@ -633,9 +644,9 @@ impl Chip {
         self.set_zero_neg_flags(self.acc);
     }
 
-    /// ======================
-    /// LOGICAL OPERATIONS
-    /// ======================
+    // ======================
+    // LOGICAL OPERATIONS
+    // ======================
 
     // and (with accumulator)
     fn and(&mut self, addr: AddressMode) {
@@ -661,9 +672,9 @@ impl Chip {
         self.set_zero_neg_flags(self.acc);
     }
 
-    /// ======================
-    /// SHIFT & ROTATE INSTRUCTIONS
-    /// ======================
+    // ======================
+    // SHIFT & ROTATE INSTRUCTIONS
+    // ======================
 
     // arithmetic shift left
     fn asl(&mut self, addr: AddressMode) {
@@ -793,9 +804,9 @@ impl Chip {
         }
     }
 
-    /// ======================
-    /// FLAG INSTRUCTIONS
-    /// ======================
+    // ======================
+    // FLAG INSTRUCTIONS
+    // ======================
 
     // clear carry
     fn clc(&mut self) {
@@ -832,9 +843,9 @@ impl Chip {
         self.set_flag(I);
     }
 
-    /// ======================
-    /// COMPARISON
-    /// ======================
+    // ======================
+    // COMPARISON
+    // ======================
 
     // compare (with accumulator)
     // SOLUTION: ... clear the damn values ...
@@ -903,9 +914,9 @@ impl Chip {
         }
     }
 
-    /// ======================
-    /// CONDITIONAL BRANCH INSTRUCTION
-    /// ======================
+    // ======================
+    // CONDITIONAL BRANCH INSTRUCTION
+    // ======================
 
     // branch on carry clear
     fn bcc(&mut self) {
@@ -971,9 +982,9 @@ impl Chip {
         }
     }
 
-    /// ======================
-    /// JUMP & SUBROUTINES
-    /// ======================
+    // ======================
+    // JUMP & SUBROUTINES
+    // ======================
 
     // jump
     fn jmp(&mut self, addr: AddressMode) {
@@ -1010,12 +1021,12 @@ impl Chip {
         self.pc = self.bytes_to_word(ll, hh) + 1;
     }
 
-    /// ======================
-    /// INTERRUPTS
-    /// ======================
+    // ======================
+    // INTERRUPTS
+    // ======================
 
     // break / interrupt
-    /// Force Break
+    // Force Break
     fn brk(&mut self) {
         let (ll, hh) = self.word_to_bytes(self.pc + 1);
         self.push_stack(hh);
@@ -1027,15 +1038,15 @@ impl Chip {
 
     // return from interrupt
     fn rti(&mut self) {
-        self.f = self.pop_stack(); // ^ (B | 0x20);
+        self.f = self.pop_stack();
         let ll = self.pop_stack();
         let hh = self.pop_stack();
         self.pc = self.bytes_to_word(ll, hh);
     }
 
-    /// ======================
-    /// OTHER
-    /// ======================
+    // ======================
+    // OTHER
+    // ======================
 
     // bit test
     fn bit(&mut self, addr: AddressMode) {
