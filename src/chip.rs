@@ -615,18 +615,9 @@ impl Chip {
         let n_7 = if byte & 0x80 == 0x80 { 1 } else { 0 };
         let (c, _) = (self.acc & 0x7F).overflowing_add((byte & 0x7F) + carry);
         let c_6 = if c & 0x80 == 0x80 { 1 } else { 0 };
-        // print!("  =>     [{:>08b}]\n", self.acc);
-        // print!("  =>   + [{:>08b}]\n", byte);
-        // print!("  =>   + [{:>08b}]\n", carry);
         let temp_res = (self.acc as u16) + (byte as u16) + (carry as u16);
         self.acc = (temp_res & 0xFF) as u8;
         let of = temp_res & 0x100 == 0x100;
-        // print!("  =>   = [{:>08b}]\n", self.acc);
-        // print!("  => m_7 = {m_7}\n");
-        // print!("  => n_7 = {n_7}\n");
-        // print!("  => carry bit at position 6\n");
-        // print!("  =>     [{:>08b}]\n", c);
-        // print!("  => c_6 = {c_6}\n");
         if m_7 == 0 && n_7 == 0 && c_6 == 1 || m_7 == 1 && n_7 == 1 && c_6 == 0 {
             self.set_flag(V)
         } else {
@@ -874,7 +865,6 @@ impl Chip {
         let address = self.get_address(addr);
         let byte = self.read_byte(address);
         let (res, _) = self.acc.overflowing_sub(byte);
-        // print!("  Comparing memory: {:>08b} to byte: {:>08b}\n", self.acc, byte);
         if self.acc >= byte {
             self.set_flag(C);
         } else {
