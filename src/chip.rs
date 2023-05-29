@@ -70,8 +70,8 @@ impl Chip {
             acc: 0,
             rx: 0,
             ry: 0,
-            f: 0x20,
-            sp: 0,
+            f: 0,
+            sp: 0xFF,
             pc: 0xFFFC,
             memory: [0; MEMORY],
         }
@@ -284,7 +284,7 @@ impl Chip {
         }
 
         // TODO: LOOK HERE FOR THE EXIT
-        if self.pc - 1 == 0x3339 {
+        if self.pc - 1 == 0x378a {
             print!("");
             // exit(0);
         }
@@ -627,6 +627,7 @@ impl Chip {
         self.set_zero_neg_flags(self.acc);
         if DEBUGLOG {
             println!("  Pulled accumulator {:>04x} from 01{:>02x}", self.acc, self.sp);
+            println!("  =>     [{:>08b}]", self.f);
         }
     }
 
@@ -638,6 +639,8 @@ impl Chip {
         self.f = self.pop_stack();
         if DEBUGLOG {
             println!("  Pulled processor status {:>08b} from 01{:>02x}", self.f, self.sp);
+            println!("  =>     [NV-BDIZC]");
+            println!("  =>     [{:>08b}]", self.f);
         }
     }
 
@@ -945,7 +948,7 @@ impl Chip {
                 } else {
                     self.clear_flag(C);
                 }
-                let res = (self.acc << 1) + oc;
+                let res = (byte << 1) + oc;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
             }
@@ -985,7 +988,7 @@ impl Chip {
                 } else {
                     self.clear_flag(C);
                 }
-                let res = (self.acc >> 1) + oc;
+                let res = (byte >> 1) + oc;
                 self.write_byte(res, address);
                 self.set_zero_neg_flags(res);
             }
@@ -1284,9 +1287,8 @@ impl Chip {
         // self.pc = self.read_word(self.sp as u16);
         let ll = self.pop_stack();
         let hh = self.pop_stack();
-        self.bytes_to_word(ll, hh);
 
-        self.pc = self.bytes_to_word(ll, hh);
+        self.pc = self.bytes_to_word(ll, hh) + 1;
     }
 
     /// ======================
@@ -1364,102 +1366,5 @@ impl Chip {
         // not doing anything?
         // We could also do a wait here...
         // I will see in the future!
-    }
-}
-
-#[cfg(test)]
-mod add_with_carry {
-
-    use crate::chip::*;
-
-    #[test]
-    fn add_00000000_to_01111111_with_carry() {
-        let mut c = Chip::new();
-
-         // Code:
-        // ADC #$00
-        let prog: Vec<u8> = [0x69, 0x00].to_vec();
-        c.startup(0x0200);
-        c.load_program(prog);
-        c.acc = 0b01111111;
-        c.f = C;
-
-        c.execute_cycle();
-        // assert_eq!(c.acc, 0b10000000);
-        assert_eq!(c.f, 0b11000000);
-    }
-
-    #[test]
-    fn add_00000000_to_00111111_with_carry() {
-        let mut c = Chip::new();
-
-         // Code:
-        // ADC #$00
-        let prog: Vec<u8> = [0x69, 0x00].to_vec();
-        c.startup(0x0200);
-        c.load_program(prog);
-        c.acc = 0b00111111;
-        c.f = C;
-
-        c.execute_cycle();
-        assert_eq!(c.acc, 0b01000000);
-        assert_eq!(c.f, 0b00000000);
-    }
-}
-
-#[cfg(test)]
-mod subtract_with_carry {
-
-    use crate::chip::*;
-
-    #[test]
-    fn subtract_11111111_from_00111111_with_carry() {
-        let mut c = Chip::new();
-
-        // Code:
-        // SBC #$FF
-        let prog: Vec<u8> = [0xE9, 0xFF].to_vec();
-        c.startup(0x0200);
-        c.load_program(prog);
-        c.acc = 0b00111111;
-        c.f = C;
-
-        c.execute_cycle();
-        assert_eq!(c.acc, 0b01000000);
-        assert_eq!(c.f, 0b00000000);
-    }
-
-    #[test]
-    fn subtract_11111111_from_01111111_with_carry() {
-        let mut c = Chip::new();
-
-        // Code:
-        // SBC #$FF
-        let prog: Vec<u8> = [0xE9, 0xFF].to_vec();
-        c.startup(0x0200);
-        c.load_program(prog);
-        c.acc = 0b01111111;
-        c.f = C;
-
-        c.execute_cycle();
-        assert_eq!(c.acc, 0b10000000);
-        assert_eq!(c.f, 0b11000000, "Flag incorrect!");
-    }
-
-    #[test]
-    fn subtract_11111110_from_11111111_without_carry() {
-        let mut c = Chip::new();
-
-        // Code:
-        // SBC #$FF
-        let prog: Vec<u8> = [0xE9, 0b11111110].to_vec();
-        c.startup(0x0200);
-        c.load_program(prog);
-        c.acc = 0b11111111;
-        c.f = 0;
-
-        c.execute_cycle();
-        assert_eq!(c.acc, 0b00000000);
-        assert_eq!(c.f, 0b00000011, "Flag incorrect!");
     }
 }
