@@ -26,3 +26,5 @@ A bad MOS 6502 emulator
 * [17] 6502 Status Flag References - <https://www.nesdev.org/wiki/Status_flags#Z:_Zero>
 * [18] 6502 Overflow Flag - <https://www.righto.com/2012/12/the-6502-overflow-flag-explained.html>
 * [19] 6502 BCD Helper Website - <http://www.6502.org/tutorials/decimal_mode.html>
+* [20] Another NES Emulator - <http://www.michaelburge.us/2019/03/18/nes-design.html>
+* [21] Another OPCODE Reference - <https://analog-hors.github.io/site/pones-p1/>
